@@ -230,21 +230,20 @@ for p in range(npasses):
     t_imu = in_imu[:,0]  + cfg.imu_t_off
     gnss_epoch_inc = cfg.gnss_epoch_step
         
-    # Init yaw
+    # Init attitude
+    rpy_init = np.deg2rad(cfg.init_rpy)
     if cfg.init_yaw_with_mag:
-        # Use magnetometer to initialize orientation states
-        rpy_init = [0, 0, np.atan2(in_imu[0,8], in_imu[0,7])]
-    else:
-        rpy_init = [0, 0, 0]
-    rpy_init[2] -= np.deg2rad(cfg.yaw_off)  # apply initial yaw offset
+        # Use magnetometer to initialize yaw
+        rpy_init[2] = np.atan2(in_imu[0,8], in_imu[0,7])
     if p == 0:  # don't reinit for 2nd pass
-        est_C_b_n = Euler_to_CTM(rpy_init)  # initial NED orientation
+        est_C_b_n = Euler_to_CTM(rpy_init).T  # initial NED orientation
    
-    # Use initial GNSS position solution to initialize pos/vel states
+    # Use initial GNSS position solution to initialize pos/vel states after adjusting for lever arm
     est_L_b, est_lambda_b, est_h_b = in_gnss[0, 1:4]    # initial LLI position
     est_v_eb_n = in_gnss[0, 14:17]  # initial NED velocity
-    est_r_eb_e, est_v_eb_e, est_C_b_e =  pvc_LLH_to_ECEF(est_L_b, est_lambda_b, 
+    r_gnss_e, v_gnss_e, est_C_b_e =  pvc_LLH_to_ECEF(est_L_b, est_lambda_b, 
             est_h_b, est_v_eb_n, est_C_b_n)
+    est_v_eb_e, est_r_eb_e = Lever_Arm(est_C_b_e, v_gnss_e, r_gnss_e, [0,0,0], - lever_arm_b)
     prev_time = start_time = t_imu[0]
     
     # Calculate earth radius and gravity for starting location
