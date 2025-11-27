@@ -24,7 +24,7 @@ Based on matlab code and textbook by Paul Groves, "Principles of GNSS, Inertial,
 import numpy as np
 from numpy.linalg import norm
 from os.path import join
-from imu_math import (Initialize_LC_P_matrix, Nav_equations_ECEF, LC_KF_Predict, 
+from imu_math import (Initialize_LC_P_matrix, Initialize_LC_Qc_matrix, Nav_equations_ECEF, LC_KF_Predict, 
                       LC_KF_GNSS_Update, LC_KF_ZUPT_Update, Align_Yaw, LC_KF_NHC_Update, 
                       LC_KF_Config, Velocity_Match, Combine_Passes, Gravity_ECEF, Reverse_Data_Dir,
                       Lever_Arm, ortho_C)
@@ -144,7 +144,6 @@ FIX, FLOAT, SINGLE = 1,2,5   # GNSS solution states
 R_0 = 6378137          # radius of WGS84
 ecc = 0.0818191908425  # eccentricity of WGS84
 g = 9.80665  # Default gravity (m/sec^2)
-ug_to_mps_squared = g * 1E-6  # micro g -> meters/sec^2
 
 ############  Start of main code ##############################
 
@@ -156,16 +155,9 @@ ns = LC_KF_config.nstates = 21 if cfg.scale_factors else 15
 nbs = 12 if cfg.scale_factors else 6
 
 # Calculate kalman process noise variances
-root_Hz = np.sqrt(cfg.imu_sample_rate)
-LC_KF_config.attitude_noise_var = (np.deg2rad(cfg.gyro_noise_PSD) * root_Hz * cfg.imu_noise_factors[0])**2
-LC_KF_config.vel_noise_var = (cfg.accel_noise_PSD * ug_to_mps_squared * root_Hz * cfg.imu_noise_factors[1])**2
-LC_KF_config.accel_bias_noise_var = (cfg.accel_bias_PSD * ug_to_mps_squared * root_Hz * cfg.imu_noise_factors[2])**2
-LC_KF_config.gyro_bias_noise_var =  (np.deg2rad(cfg.gyro_bias_PSD) * root_Hz * cfg.imu_noise_factors[3])**2
-if cfg.scale_factors:
-    LC_KF_config.accel_scale_noise_var = (cfg.accel_scale_noise_SD * ug_to_mps_squared * root_Hz * cfg.imu_noise_factors[4])**2
-    LC_KF_config.gyro_scale_noise_var = (np.deg2rad(cfg.gyro_scale_noise_SD) * root_Hz * cfg.imu_noise_factors[5])**2
+Qc = Initialize_LC_Qc_matrix(cfg, ns)
 
-# Calculate kalman measurement noise variances    
+# Calculate kalman measurement noise variances
 LC_KF_config.zupt_vel_var = cfg.zupt_vel_SD**2 
 LC_KF_config.zaru_gyro_var = np.deg2rad(cfg.zaru_gyro_SD)**2
 LC_KF_config.nhc_vel_var = cfg.nhc_vel_SD**2
@@ -309,7 +301,7 @@ for p in range(npasses):
 
         # Kalman state prediction if run for both IMU and GNSS measurements
         P = LC_KF_Predict(tor_i, est_C_b_e, est_v_eb_e, est_r_eb_e, est_IMU_bias,
-                       P, meas_f_ib_b, meas_omega_ib_b, LC_KF_config,
+                       P, Qc, meas_f_ib_b, meas_omega_ib_b, LC_KF_config,
                        gravity, geocentric_radius)
     
         # Check for next GNSS measurement

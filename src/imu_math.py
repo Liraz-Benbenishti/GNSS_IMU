@@ -89,6 +89,30 @@ def Initialize_LC_P_matrix(LC_KF_config, C_e_n):
         P[18:21, 18:21] = np.eye(3) * np.array(LC_KF_config.init.scale_gyro_unc)**2
     return P
 
+def Initialize_LC_Qc_matrix(cfg, ns):
+    # Build continuous-time kalman process noise variances matrix (14.82)
+    g = 9.80665  # Default gravity (m/sec^2)
+    ug_to_mps_squared = g * 1E-6  # micro g -> meters/sec^2
+    root_Hz = np.sqrt(cfg.imu_sample_rate)
+    attitude_noise_var = (np.deg2rad(cfg.gyro_noise_PSD) * root_Hz * cfg.imu_noise_factors[0])**2
+    vel_noise_var = (cfg.accel_noise_PSD * ug_to_mps_squared * root_Hz * cfg.imu_noise_factors[1])**2
+    accel_bias_noise_var = (cfg.accel_bias_PSD * ug_to_mps_squared * root_Hz * cfg.imu_noise_factors[2])**2
+    gyro_bias_noise_var =  (np.deg2rad(cfg.gyro_bias_PSD) * root_Hz * cfg.imu_noise_factors[3])**2
+    if cfg.scale_factors:
+        accel_scale_noise_var = (cfg.accel_scale_noise_SD * ug_to_mps_squared * root_Hz * cfg.imu_noise_factors[4])**2
+        gyro_scale_noise_var = (np.deg2rad(cfg.gyro_scale_noise_SD) * root_Hz * cfg.imu_noise_factors[5])**2
+
+    Qc = np.zeros((ns, ns))
+    Qc[0:3, 0:3] = np.eye(3) * attitude_noise_var
+    Qc[3:6, 3:6] = np.eye(3) * vel_noise_var
+    Qc[9:12, 9:12] = np.eye(3) * accel_bias_noise_var
+    Qc[12:15, 12:15] = np.eye(3) * gyro_bias_noise_var
+    if ns == 21: # Scale factors
+        Qc[15:18, 15:18] = np.eye(3) * accel_scale_noise_var
+        Qc[18:21, 18:21] = np.eye(3) * gyro_scale_noise_var
+
+    return Qc
+
 def Skew_symmetric(a):
     #Skew_symmetric - Calculates skew-symmetric matrix
     #
@@ -215,7 +239,7 @@ def Nav_equations_ECEF(tor_i, old_r_eb_e, old_v_eb_e, old_C_b_e, f_ib_b,
     return r_eb_e, v_eb_e, C_b_e
 
 
-def LC_KF_Predict(tor_s, est_C_b_e, est_v_eb_e, est_r_eb_e, est_IMU_bias, P,
+def LC_KF_Predict(tor_s, est_C_b_e, est_v_eb_e, est_r_eb_e, est_IMU_bias, P, Qc,
                 meas_f_ib_b, meas_omega_ib_b, LC_KF_config, gravity, geocentric_radius):
     #LC_KF_Epoch - Implements one cycle of the loosely coupled INS/GNSS
     # Kalman filter plus closed-loop correction of all inertial states
@@ -271,15 +295,8 @@ def LC_KF_Predict(tor_s, est_C_b_e, est_v_eb_e, est_r_eb_e, est_IMU_bias, P,
         Phi[3:6, 15:18] = est_C_b_e @ np.diag(meas_f_ib_b) * tor_s
         Phi[0:3, 18:21] = est_C_b_e @ np.diag(meas_omega_ib_b) * tor_s
 
-    # 2. Determine approximate system noise covariance matrix using (14.82)
-    Q_prime = np.zeros((ns, ns))
-    Q_prime[0:3, 0:3] = np.eye(3) * LC_KF_config.attitude_noise_var * abs_tor_s
-    Q_prime[3:6, 3:6] = np.eye(3) * LC_KF_config.vel_noise_var * abs_tor_s
-    Q_prime[9:12, 9:12] = np.eye(3) * LC_KF_config.accel_bias_noise_var * abs_tor_s
-    Q_prime[12:15, 12:15] = np.eye(3) * LC_KF_config.gyro_bias_noise_var * abs_tor_s
-    if ns == 21: #Scale factors
-        Q_prime[15:18, 15:18] = np.eye(3) * LC_KF_config.accel_scale_noise_var * abs_tor_s
-        Q_prime[18:21, 18:21] = np.eye(3) * LC_KF_config.gyro_scale_noise_var * abs_tor_s
+    #2. Discretize: Q'  Qc * dt
+    Q_prime = Qc * abs_tor_s
 
     # 3. Propagate state estimates using (3.14) noting that all states are zero 
     # due to closed-loop correction.

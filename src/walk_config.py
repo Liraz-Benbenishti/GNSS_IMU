@@ -74,8 +74,8 @@ zaru_gyro_SD = 0.01   # standard dev (deg/sec)
 # Initial yaw alignment
 yaw_align = True # use GNSS heading to initialize yaw
 yaw_align_min_vel = 1.0  # min vel (m/sec)
-yaw_off = 0 # adjustment from initial yaw or mag (deg), just needs to be approximate
 init_yaw_with_mag = False
+init_rpy = [0, 0, 0] # initial roll, pitch, yaw (deg)
 
 # Non-holomonic constrains (NHC) update
 nhc_enable = False
