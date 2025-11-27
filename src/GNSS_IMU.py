@@ -30,7 +30,7 @@ from imu_math import (Initialize_LC_P_matrix, Nav_equations_ECEF, LC_KF_Predict,
                       Lever_Arm, ortho_C)
 from imu_files import Read_GNSS_data, Read_IMU_data, Write_GNSS_data
 from imu_plot import Plot_Results, Plot_Biases, Plot_IMU, Plot_Uncertainties
-from imu_transforms import (CTM_to_Euler, Euler_to_CTM, pvc_LLH_to_ECEF, pvc_ECEF_to_LLH)
+from imu_transforms import (CTM_to_Euler, Euler_to_CTM, pvc_LLH_to_ECEF, pvc_ECEF_to_LLH, compute_C_e_n)
 
 ##########  Data selection and run configuration ########################################
 
@@ -259,7 +259,8 @@ for p in range(npasses):
     outp[0, 7:10, p] = CTM_to_Euler(est_C_b_n.T).flatten()
     
     # Initialize Kalman filter P matrix and IMU bias states
-    P = Initialize_LC_P_matrix(LC_KF_config)
+    C_e_n = compute_C_e_n(est_L_b, est_lambda_b,) # Map to ECEF
+    P = Initialize_LC_P_matrix(LC_KF_config, C_e_n.T)
     est_IMU_bias = np.zeros(nbs)
     out_IMU_bias_est[0, 0, p] = prev_time
     out_IMU_bias_est[0, 1:nbs+1, p] = est_IMU_bias

@@ -60,7 +60,7 @@ def Gravity_ECEF(r_eb_e):
     g[0:2] += omega_ie**2 * r_eb_e[0:2]
     return g
 
-def Initialize_LC_P_matrix(LC_KF_config):
+def Initialize_LC_P_matrix(LC_KF_config, C_e_n):
     #Initialize_LC_P_matrix - Initializes the loosely coupled INS/GNSS KF
     #error covariance matrix
     #
@@ -78,9 +78,10 @@ def Initialize_LC_P_matrix(LC_KF_config):
     # Initialize error covariance matrix
     ns = LC_KF_config.nstates
     P = np.zeros((ns, ns))
-    P[0:3, 0:3] = np.eye(3) * np.array(LC_KF_config.init.att_unc)**2
-    P[3:6, 3:6] = np.eye(3) * np.array(LC_KF_config.init.vel_unc)**2
-    P[6:9, 6:9] = np.eye(3) * np.array(LC_KF_config.init.pos_unc)**2
+    
+    P[0:3, 0:3] = C_e_n @ (np.eye(3) * np.array(LC_KF_config.init.att_unc)**2) @ C_e_n.T
+    P[3:6, 3:6] = C_e_n @ (np.eye(3) * np.array(LC_KF_config.init.vel_unc)**2) @ C_e_n.T
+    P[6:9, 6:9] = C_e_n @ (np.eye(3) * np.array(LC_KF_config.init.pos_unc)**2) @ C_e_n.T
     P[9:12, 9:12] = np.eye(3) * np.array(LC_KF_config.init.bias_acc_unc)**2
     P[12:15, 12:15] = np.eye(3) *np.array(LC_KF_config.init.bias_gyro_unc)**2
     if ns == 21:  # Scale factors
