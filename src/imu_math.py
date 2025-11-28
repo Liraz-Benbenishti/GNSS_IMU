@@ -399,26 +399,22 @@ def LC_KF_ZUPT_Update(est_C_b_e, est_v_eb_e, meas_omega_ib_b,
     
     return(est_C_b_e_new, est_v_eb_e_new, est_IMU_bias_new, P_new)
 
-def Align_Yaw(est_C_b_e, est_C_b_n, GNSS_v_eb_n, P, run_dir):
+def Align_Yaw(est_C_b_e, est_C_b_n, GNSS_v_eb_n, run_dir):
     
-    # Calculate yaw error
+    # Calculate yaw error in NED
     yaw_est_n = np.arctan2(est_C_b_n[1,0], est_C_b_n[0,0])
     hdg_meas_n = np.arctan2(GNSS_v_eb_n[1], GNSS_v_eb_n[0])
-    #delta_yaw_n = (hdg_meas - yaw_est  + np.pi) % (2 * np.pi) - np.pi
-    delta_yaw_n = np.arctan2(np.sin(hdg_meas_n - yaw_est_n), np.cos(hdg_meas_n - yaw_est_n))
+    #delta_yaw_n = (hdg_meas - yaw_est  + np.pi) % (2 * np.pi) - np.pi # Simple
+    delta_yaw_n = np.arctan2(np.sin(hdg_meas_n - yaw_est_n), np.cos(hdg_meas_n - yaw_est_n)) # Robust
     print(' GNSS hdg=%.2f, yaw_est=%.2f,  Delta yaw=%.2f deg' % (np.rad2deg(hdg_meas_n), np.rad2deg(yaw_est_n), np.rad2deg(delta_yaw_n)))
-    R_n = Euler_to_CTM([0, 0, -delta_yaw_n])
     
-    est_C_n_e = ortho_C(ortho_C(est_C_b_e) @ ortho_C(est_C_b_n.T))
+    # Rotate from NED to ECEF
+    R_n = Euler_to_CTM([0, 0, -delta_yaw_n])
+    est_C_n_e = est_C_b_e @ est_C_b_n.T
     R_e = est_C_n_e @ R_n @ est_C_n_e.T
     C_b_e_new = ortho_C(R_e @ est_C_b_e)
-    
-    # Covariance reset: rotate only the attitude 3x3 (ECEF basis), rest identity
-    G = np.eye(P.shape[0])
-    G[0:3, 0:3] = R_e                 # attitude small-angles are in ECEF
-    P_new = G @ P @ G.T
-    
-    return(C_b_e_new, P_new)
+   
+    return(C_b_e_new)
 
 # Non-Holonomic Constraint (NHC) Measurement Update
 def LC_KF_NHC_Update(est_C_b_e, est_v_eb_e, meas_omega_ib_b, r_lever_arm_b,est_IMU_bias, P, LC_KF_config, coast):
@@ -498,9 +494,6 @@ def Combine_Passes(profiles):
     outp[:,11:14] = np.average(profiles[:,10:13,:], weights=1/(0.1+profiles[:,11:14,:]), axis=2)
     outp[:,14:17] = np.average(profiles[:,13:16,:], weights=1/(0.1+profiles[:,14:17,:]), axis=2)
     return(outp)
-    
-
-
 
 def Zero_Phase_LP(data, cutoff, fs, order=4):
     nyquist = 0.5 * fs

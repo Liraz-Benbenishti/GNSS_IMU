@@ -351,7 +351,7 @@ for p in range(npasses):
                         if norm(est_v_eb_e) > cfg.yaw_align_min_vel and fix[in_gnss_ptr] == FIX :  # check forward velocity
                             print('   %.2f sec: Yaw align: ' % (time - t_gnss[0]), end='')
                             _, _, _, _, est_C_b_n = pvc_ECEF_to_LLH(est_r_eb_e, est_v_eb_e, est_C_b_e)
-                            est_C_b_e, P  = Align_Yaw(est_C_b_e, est_C_b_n, GNSS_v_eb_n, P, run_dir)
+                            est_C_b_e  = Align_Yaw(est_C_b_e, est_C_b_n, GNSS_v_eb_n, run_dir)
                             yaw_aligned = True  # just do once to initialize yaw
                                                     
             # Generate KF uncertainty and IMU bias output records
