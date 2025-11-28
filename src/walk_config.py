@@ -56,6 +56,7 @@ imu_t_off = 0   # time to add to IMU time stamps to acccount for logging delay (
 run_dir = [1]  # run direction ([-1]=backwards, [1]=forwards, [-1,1] = combined)
 gnss_epoch_step = 1 # GNSS input sample decimation (1=use all GNSS samples)
 out_step = 1  # Output decimation [1=include all samples]
+out_frame = 'gnss'   # 'imu', 'gnss', or 'origin'
 float_err_gain = 2 # mulitplier on pos/vel stdevs if in float mode
 single_err_gain = 5  # mulitplier on pos/vel stdevs if in single mode
 

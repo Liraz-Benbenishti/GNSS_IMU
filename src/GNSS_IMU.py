@@ -169,8 +169,8 @@ LC_KF_Config.init.att_unc = np.deg2rad(cfg.init.att_unc)
 LC_KF_Config.init.bias_gyro_unc = np.deg2rad(cfg.init.bias_gyro_unc)
 
 # lever arm
-lever_arm_b = np.array(cfg.imu_offset) - np.array(cfg.gnss_offset)
-LC_KF_config.lever_arm_b = lever_arm_b   # lever arm in body frame
+r_lever_arm_b = np.array(cfg.imu_offset) - np.array(cfg.gnss_offset)
+LC_KF_config.r_lever_arm_b = r_lever_arm_b   # lever arm in body frame
 
 # Load input measurements
 in_gnss, num_gnss, ok = Read_GNSS_data(join(dataDir, 'gnss_%s.pos' % fileIn ))
@@ -235,7 +235,7 @@ for p in range(npasses):
     est_v_eb_n = in_gnss[0, 14:17]  # initial NED velocity
     r_gnss_e, v_gnss_e, est_C_b_e =  pvc_LLH_to_ECEF(est_L_b, est_lambda_b, 
             est_h_b, est_v_eb_n, est_C_b_n)
-    est_v_eb_e, est_r_eb_e = Lever_Arm(est_C_b_e, v_gnss_e, r_gnss_e, [0,0,0], - lever_arm_b)
+    est_v_eb_e, est_r_eb_e = Lever_Arm(est_C_b_e, v_gnss_e, r_gnss_e, [0,0,0], - r_lever_arm_b)
     prev_time = start_time = t_imu[0]
     
     # Calculate earth radius and gravity for starting location
@@ -323,8 +323,8 @@ for p in range(npasses):
                     # Get next GNSS measurement
                     GNSS_L_b, GNSS_lambda_b, GNSS_h_b = in_gnss[in_gnss_ptr, 1:4]    # LLI position
                     GNSS_v_eb_n = in_gnss[in_gnss_ptr, 14:17]  # NED velocity
-                    LC_KF_config.pos_meas_SD = in_gnss[in_gnss_ptr,6:9] * cfg.gnss_noise_factors[0] * noise_gain
-                    LC_KF_config.vel_meas_SD = in_gnss[in_gnss_ptr,17:20] * cfg.gnss_noise_factors[1] * noise_gain
+                    pos_meas_SD = in_gnss[in_gnss_ptr,6:9] * cfg.gnss_noise_factors[0] * noise_gain
+                    vel_meas_SD = in_gnss[in_gnss_ptr,17:20] * cfg.gnss_noise_factors[1] * noise_gain
                     GNSS_r_eb_e, GNSS_v_eb_e, _ = pvc_LLH_to_ECEF(GNSS_L_b, GNSS_lambda_b, 
                             GNSS_h_b, GNSS_v_eb_n, np.zeros((3,3)))
                     time_GNSS = time_next_GNSS
@@ -342,7 +342,7 @@ for p in range(npasses):
                     
                     # Run GNSS Measurement Update for Kalman Filter
                     est_C_b_e, est_v_eb_e, est_r_eb_e, est_IMU_bias, P = LC_KF_GNSS_Update(
-                        GNSS_r_eb_e, GNSS_v_eb_e, est_C_b_e, est_v_eb_e,
+                        GNSS_r_eb_e, GNSS_v_eb_e, pos_meas_SD, vel_meas_SD, est_C_b_e, est_v_eb_e,
                         est_r_eb_e, est_IMU_bias, P, meas_f_ib_b, meas_omega_ib_b,
                         LC_KF_config)
                     
@@ -401,8 +401,8 @@ for p in range(npasses):
         est_C_b_e = ortho_C(est_C_b_e)
         
         # Calculate position, velocity at GNSS antenna and system origin for output profile
-        est_v_gnss_e, est_r_gnss_e = Lever_Arm(est_C_b_e, est_v_eb_e, est_r_eb_e, meas_omega_ib_b, lever_arm_b)
-        est_v_ref_e, _ = Lever_Arm(est_C_b_e, est_v_eb_e, est_r_eb_e, meas_omega_ib_b, -np.array(cfg.imu_offset))
+        est_v_gnss_e, est_r_gnss_e = Lever_Arm(est_C_b_e, est_v_eb_e, est_r_eb_e, meas_omega_ib_b, r_lever_arm_b)
+        est_v_ref_e, est_r_ref_e = Lever_Arm(est_C_b_e, est_v_eb_e, est_r_eb_e, meas_omega_ib_b, -np.array(cfg.imu_offset))
         
         # Calculate velocity in body frame at system origin for output profile
         v_b = est_C_b_e.T @ est_v_ref_e  
@@ -410,8 +410,15 @@ for p in range(npasses):
         # Generate output profile record
         _, _, _, _, est_C_b_n = pvc_ECEF_to_LLH(est_r_eb_e, est_v_eb_e, est_C_b_e)
         outp[epoch, 0, p] = time
-        outp[epoch, 1:4, p] = est_r_gnss_e # est_r_eb_e   # ECEF
-        outp[epoch, 4:7, p] = est_v_gnss_e # est_v_eb_e   # ECEF
+        if cfg.out_frame == 'gnss':
+            outp[epoch, 1:4, p] = est_r_gnss_e # ECEF
+            outp[epoch, 4:7, p] = est_v_gnss_e # ECEF
+        elif cfg.out_frame == 'origin':
+            outp[epoch, 1:4, p] = est_r_ref_e # ECEF
+            outp[epoch, 4:7, p] = est_v_ref_e # ECEF
+        else:  
+            outp[epoch, 1:4, p] = est_r_eb_e # est_r_eb_e   # ECEF
+            outp[epoch, 4:7, p] = est_v_eb_e # est_v_eb_e   # ECEF
         outp[epoch, 7:10, p] = CTM_to_Euler(est_C_b_n.T).flatten() 
         outp[epoch,17:20, p] = v_b
 

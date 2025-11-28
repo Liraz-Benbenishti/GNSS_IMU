@@ -307,7 +307,7 @@ def LC_KF_Predict(tor_s, est_C_b_e, est_v_eb_e, est_r_eb_e, est_IMU_bias, P, Qc,
 
     return(P_propagated)
 
-def LC_KF_GNSS_Update(GNSS_r_eb_e, GNSS_v_eb_e,
+def LC_KF_GNSS_Update(GNSS_r_eb_e, GNSS_v_eb_e, pos_meas_SD, vel_meas_SD,
                 est_C_b_e, est_v_eb_e, est_r_eb_e, est_IMU_bias,
                 P_propagated, meas_f_ib_b, meas_omega_ib_b, LC_KF_config):
 
@@ -324,15 +324,15 @@ def LC_KF_GNSS_Update(GNSS_r_eb_e, GNSS_v_eb_e,
     # GNSS position and velocity are independent and have equal variance.
     R = np.zeros((6, 6))
     # Use same value for X,Y, and Z
-    R[0:3, 0:3] = np.eye(3) * (LC_KF_config.pos_meas_SD**2)
-    R[3:6, 3:6] = np.eye(3) * (LC_KF_config.vel_meas_SD**2)
+    R[0:3, 0:3] = np.eye(3) * pos_meas_SD**2
+    R[3:6, 3:6] = np.eye(3) * vel_meas_SD**2
 
     # Calculate Kalman gain using (3.21)
     K = P_propagated @ H.T @ inv(H @ P_propagated @ H.T + R)
 
     # Transform vel/pos estimates from IMU frame to GNSS frame using lever arm
     est_v_gnss_e, est_r_gnss_e = Lever_Arm(est_C_b_e, est_v_eb_e, est_r_eb_e, meas_omega_ib_b,
-                                           LC_KF_config.lever_arm_b)
+                                           LC_KF_config.r_lever_arm_b)
 
     # Formulate measurement innovations using (14.102)
     delta_z = np.zeros((6, 1))
@@ -421,7 +421,7 @@ def Align_Yaw(est_C_b_e, est_C_b_n, GNSS_v_eb_n, P, run_dir):
     return(C_b_e_new, P_new)
 
 # Non-Holonomic Constraint (NHC) Measurement Update
-def LC_KF_NHC_Update(est_C_b_e, est_v_eb_e, meas_omega_ib_b, lever_arm_b,est_IMU_bias, P, LC_KF_config, coast):
+def LC_KF_NHC_Update(est_C_b_e, est_v_eb_e, meas_omega_ib_b, r_lever_arm_b,est_IMU_bias, P, LC_KF_config, coast):
     
     # Propagated state estimates are all zero due to closed-loop correction.
     ns = LC_KF_config.nstates
@@ -441,7 +441,7 @@ def LC_KF_NHC_Update(est_C_b_e, est_v_eb_e, meas_omega_ib_b, lever_arm_b,est_IMU
     K = P @ H.T @ inv(H @ P @ H.T + R)
 
     # Transform velocity to body frame
-    v_b = est_C_b_e.T @ est_v_eb_e + np.cross(meas_omega_ib_b, np.array(lever_arm_b))
+    v_b = est_C_b_e.T @ est_v_eb_e + np.cross(meas_omega_ib_b, np.array(r_lever_arm_b))
     
     delta_z = 0 - v_b[1:3].reshape((2, 1))  # meas - estimated
 
