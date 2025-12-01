@@ -386,10 +386,9 @@ def LC_KF_ZUPT_Update(est_C_b_e, est_v_eb_e, meas_omega_ib_b,
     x_est_new = x_est + K @ delta_z
     
     # Covariance update
-    # Simple form
-    #P_new = (np.eye(ns) - K @ H) @ P_propagated
-    # More stable form
-    P_new = (np.eye(ns) - K @ H) @ P_propagated @ (np.eye(ns) - K @ H).T + K @ R @ K.T
+    I = np.eye(ns)
+    #P_new = (I - K @ H) @ P_propagated # Simple form
+    P_new = (I - K @ H) @ P_propagated @ (I - K @ H).T + K @ R @ K.T # More stable form
     
     # Closed-loop correction
     est_C_b_e_new = (np.eye(3) - Skew_symmetric(x_est_new[0:3].flatten())) @ est_C_b_e 
@@ -497,6 +496,9 @@ def Combine_Passes(profiles):
 
 def Zero_Phase_LP(data, cutoff, fs, order=4):
     nyquist = 0.5 * fs
+    if cutoff >= nyquist:
+        print('Warning: Data not filtered, cutoff freq > nyquist')
+        return data
     norm_cutoff = cutoff / nyquist
     b, a = butter(order, norm_cutoff, btype='low', analog=False)
     filtered = filtfilt(b, a, data, axis=0)  # forward-backward filter

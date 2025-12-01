@@ -105,5 +105,5 @@ def Write_GNSS_data(filename, out_profile, out_KF_SD):
     outg[:,5] = 20   # nsats
     outg[:,6:14] = 0  # pos covariance
     outg[:,17:23] = 0 # vel covariance
-    outg[:,23:26] = out_profile[:,7:10]  # orientation
+    outg[:,23:26] = np.rad2deg(out_profile[:,7:10])  # orientation
     np.savetxt(filename, outg, header=hdrg, encoding='utf-8', fmt=fmtg, delimiter=' ', comments='')

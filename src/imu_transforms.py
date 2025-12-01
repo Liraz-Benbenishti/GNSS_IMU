@@ -266,9 +266,7 @@ def NED_to_ECEF(L_b, lambda_b, h_b, v_eb_n, C_b_n):
     # Outputs:
     #   r_eb_e        Cartesian position of body frame w.r.t. ECEF frame, resolved
     #                 along ECEF-frame axes (m)
-    #   v_eb_e        velocity of body frame w.r.t. ECEF frame, resolved along
-    #                 ECEF-frame axes (m/s)
-    #   C_b_e         body-to-ECEF-frame coordinate transformation matrix
+
     
     # Parameters
     R_0 = 6378137
@@ -289,7 +287,7 @@ def NED_to_ECEF(L_b, lambda_b, h_b, v_eb_n, C_b_n):
         ((1 - e**2) * R_E + h_b) * sin_lat
     ])
 
-    return r_eb_e #, v_eb_e, C_b_e
+    return r_eb_e
 
 def LLH_to_ECEF(llh):
     

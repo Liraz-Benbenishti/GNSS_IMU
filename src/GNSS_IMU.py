@@ -279,6 +279,8 @@ for p in range(npasses):
         # Update time and coast status
         time = t_imu[epoch]
         tor_i = time - prev_time
+        if tor_i < 1e-5:
+            continue
         coast = outp[epoch,10,p]  # get coast status for this epoch
         
         # Get next IMU measurements and correct for biases and misalignment
@@ -287,8 +289,8 @@ for p in range(npasses):
         meas_omega_ib_b = C_imu_misalign @ in_imu[epoch, 4:7]
         meas_omega_ib_b -= est_IMU_bias[3:6]
         if cfg.scale_factors:
-            meas_f_ib_b *= (1 + est_IMU_bias[6:9])
-            meas_omega_ib_b *= (1 + est_IMU_bias[9:12])
+            meas_f_ib_b *= (1 - est_IMU_bias[6:9])
+            meas_omega_ib_b *= (1 - est_IMU_bias[9:12])
 
         # Update estimated navigation solution unless in IMU coast mode
         if time * run_dir >= t_gnss[0] * run_dir: # don't run IMU before first GNSS sample
