@@ -169,7 +169,7 @@ LC_KF_Config.init.att_unc = np.deg2rad(cfg.init.att_unc)
 LC_KF_Config.init.bias_gyro_unc = np.deg2rad(cfg.init.bias_gyro_unc)
 
 # lever arm
-r_lever_arm_b = np.array(cfg.imu_offset) - np.array(cfg.gnss_offset)
+r_lever_arm_b = np.array(cfg.gnss_offset) - np.array(cfg.imu_offset)
 LC_KF_config.r_lever_arm_b = r_lever_arm_b   # lever arm in body frame
 
 # Load input measurements

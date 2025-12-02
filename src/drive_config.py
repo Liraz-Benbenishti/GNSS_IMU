@@ -32,7 +32,7 @@ imu_misalign = np.array([180.0, 0.0, 180.0])   # IMU orientation
 imu_misalign += np.array([0, -6.79, 5.35]) # IMU misalign to body frame (degrees rpy)
 
 # GNSS parameters 
-gnss_offset = [0, -0.05, -0.65]  # offset from system origin: forward, right, down (m)
+gnss_offset = [0, 0.05, -0.65]  # offset from system origin: forward, right, down (m)
 
 # Magnetometer parameters
 mag_enable = False
