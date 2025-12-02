@@ -20,6 +20,7 @@ from imu_math import Init
 import numpy as np
 
 # IMU parameters
+imu_config = 'PSD'  # 'PSD' or 'random_walk'
 imu_sample_rate = 100
 imu_offset   = [0, -0.05, 0]  # offset from system origin:  N, E, D (m)
 gyro_noise_PSD =  0.0038  # deg/sec/sqrt (Hz)

@@ -24,10 +24,10 @@ Based on matlab code and textbook by Paul Groves, "Principles of GNSS, Inertial,
 import numpy as np
 from numpy.linalg import norm
 from os.path import join
-from imu_math import (Initialize_LC_P_matrix, Initialize_LC_Qc_matrix, Nav_equations_ECEF, LC_KF_Predict, 
-                      LC_KF_GNSS_Update, LC_KF_ZUPT_Update, Align_Yaw, LC_KF_NHC_Update, 
-                      LC_KF_Config, Velocity_Match, Combine_Passes, Gravity_ECEF, Reverse_Data_Dir,
-                      Lever_Arm, ortho_C)
+from imu_math import (Init_P_matrix, Init_Qc_matrix_PSD, Init_Qc_matrix_random_walk, 
+                      Nav_equations_ECEF, LC_KF_Predict, LC_KF_GNSS_Update, LC_KF_ZUPT_Update, 
+                      Align_Yaw, LC_KF_NHC_Update, Lever_Arm, ortho_C,
+                      LC_KF_Config, Velocity_Match, Combine_Passes, Gravity_ECEF, Reverse_Data_Dir)
 from imu_files import Read_GNSS_data, Read_IMU_data, Write_GNSS_data
 from imu_plot import Plot_Results, Plot_Biases, Plot_IMU, Plot_Uncertainties
 from imu_transforms import (CTM_to_Euler, Euler_to_CTM, pvc_LLH_to_ECEF, pvc_ECEF_to_LLH, compute_C_e_n)
@@ -154,8 +154,11 @@ npasses = len(cfg.run_dir)
 ns = LC_KF_config.nstates = 21 if cfg.scale_factors else 15
 nbs = 12 if cfg.scale_factors else 6
 
-# Calculate kalman process noise variances
-Qc = Initialize_LC_Qc_matrix(cfg, ns)
+# Build continuous-time kalman process noise variances matrix (Qc)
+if cfg.imu_config == 'PSD': # use PSD IMU specs
+    Qc = Init_Qc_matrix_PSD(cfg, ns)
+else:  # 'random_walk'  # use random walk IMU specs
+    Qc = Init_Qc_matrix_random_walk(cfg, ns)
 
 # Calculate kalman measurement noise variances
 LC_KF_config.zupt_vel_var = cfg.zupt_vel_SD**2 
@@ -252,7 +255,7 @@ for p in range(npasses):
     
     # Initialize Kalman filter P matrix and IMU bias states
     C_e_n = compute_C_e_n(est_L_b, est_lambda_b,) # Map to ECEF
-    P = Initialize_LC_P_matrix(LC_KF_config, C_e_n.T)
+    P = Init_P_matrix(LC_KF_config, C_e_n.T)
     est_IMU_bias = np.zeros(nbs)
     out_IMU_bias_est[0, 0, p] = prev_time
     out_IMU_bias_est[0, 1:nbs+1, p] = est_IMU_bias

@@ -60,8 +60,8 @@ def Gravity_ECEF(r_eb_e):
     g[0:2] += omega_ie**2 * r_eb_e[0:2]
     return g
 
-def Initialize_LC_P_matrix(LC_KF_config, C_e_n):
-    #Initialize_LC_P_matrix - Initializes the loosely coupled INS/GNSS KF
+def Init_P_matrix(LC_KF_config, C_e_n):
+    #Initialize_P_matrix - Initializes the loosely coupled INS/GNSS KF
     #error covariance matrix
     #
     # Inputs:
@@ -89,7 +89,7 @@ def Initialize_LC_P_matrix(LC_KF_config, C_e_n):
         P[18:21, 18:21] = np.eye(3) * np.array(LC_KF_config.init.scale_gyro_unc)**2
     return P
 
-def Initialize_LC_Qc_matrix(cfg, ns):
+def Init_Qc_matrix_PSD(cfg, ns):
     # Build continuous-time kalman process noise variances matrix (14.82)
     g = 9.80665  # Default gravity (m/sec^2)
     ug_to_mps_squared = g * 1E-6  # micro g -> meters/sec^2
@@ -107,10 +107,31 @@ def Initialize_LC_Qc_matrix(cfg, ns):
     Qc[3:6, 3:6] = np.eye(3) * vel_noise_var
     Qc[9:12, 9:12] = np.eye(3) * accel_bias_noise_var
     Qc[12:15, 12:15] = np.eye(3) * gyro_bias_noise_var
-    if ns == 21: # Scale factors
+    if cfg.scale_factors:
         Qc[15:18, 15:18] = np.eye(3) * accel_scale_noise_var
         Qc[18:21, 18:21] = np.eye(3) * gyro_scale_noise_var
 
+    return Qc
+
+def Init_Qc_matrix_random_walk(cfg, ns):
+    # Build continuous-time kalman process noise variances matrix (Qc)
+
+    tau = cfg.corr_time * 3600.0 # Correlation time tau in seconds
+    gyro_arw = np.deg2rad(cfg.gyro_arw) / np.sqrt(3600.0)  # deg/sqrt(h) -> rad/s/sqrt(s)
+    acc_vrw = cfg.acc_vrw / np.sqrt(3600.0) # m/s/sqrt(h) -> m/s/sqrt(s)
+    gyro_bias_std = np.deg2rad(cfg.gyro_bias_std) / 3600.0 # deg/h -> rad/s
+    acc_bias_std = cfg.acc_bias_std * 1e-5 # mGal -> m/s^2,  1 Gal = 0.01 m/s^2
+    
+    Qc = np.zeros((ns, ns))
+    Qc[0:3, 0:3] = (gyro_arw ** 2) * np.eye(3) # White gyro noise driving attitude error (δθ): gyrarw^2
+    Qc[3:6, 3:6] = (acc_vrw ** 2) * np.eye(3) # White accel noise driving velocity error (δv): accvrw^2
+    Qc[9:12, 9:12] = (2.0 * acc_bias_std ** 2 / tau) * np.eye(3) # Gauss–Markov accel bias: 2*σ^2 / tau
+    Qc[12:15, 12:15] = (2.0 * gyro_bias_std ** 2 / tau) * np.eye(3) # Gauss–Markov gyro bias: 2*σ^2 / tau
+    if ns == 21:
+        # Gauss–Markov gyro scale factor: 2*σ^2 / tau
+        Qc[18:21, 18:21] = (2.0 * cfg.gyro_scale_std ** 2 / tau) * np.eye(3)
+        Qc[15:18, 15:18] = (2.0 * cfg.acc_scale_std ** 2 / tau) * np.eye(3)
+    
     return Qc
 
 def Skew_symmetric(a):
