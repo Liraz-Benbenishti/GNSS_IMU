@@ -44,11 +44,11 @@ gnss_noise_factors = [1, 1]  # position, velocity
 
 # Initial uncertainties
 init =Init()
-init.att_unc = [10, 10, 100]   # initial attitude uncertainty per axis in (deg)
+init.att_unc = [10, 10, 10]   # initial attitude uncertainty per axis in (deg)
 init.vel_unc = [0.05, 0.05, 0.1]  # initial velocity uncertainty per axis (m/s)
 init.pos_unc = [0.05, 0.05, 0.1]  # initial position uncertainty per axis (m)
-init.bias_acc_unc = 0.2 # initial accel bias uncertainty (m/sec^2)
-init.bias_gyro_unc = 0.2 # initial gyro bias uncertainty (deg/sec)
+init.bias_acc_unc = 0.1 # initial accel bias uncertainty (m/sec^2)
+init.bias_gyro_unc = 0.1 # initial gyro bias uncertainty (deg/sec)
 init.scale_acc_unc = 0.001
 init.scale_gyro_unc = 0.001
 
@@ -76,9 +76,9 @@ zaru_gyro_SD = 0.01   # standard dev (deg/sec)
 
 # Initial yaw alignment
 yaw_align = True # use GNSS heading to initialize yaw
-yaw_align_min_vel = 1.0  # min vel (m/sec)
+yaw_align_min_vel = 0.25  # threshold to start yaw align (m/sec)
+yaw_align_max_vel = 5.0  # threshold to end yaw align (m/sec)
 init_yaw_with_mag = False
-init_rpy = [0, 0, 0] # initial roll, pitch, yaw (deg)
 
 # Non-holomonic constrains (NHC) update
 nhc_enable = False
@@ -98,6 +98,7 @@ gyro_bias_err = [0, 0, 0]  # Add constant error to gyro biases (deg/sec)
 accel_bias_err = [0, 0, 0]  # Add constant error to acc biases (m/sec^2)
 gyro_scale_factor = [1, 1, 1]
 accel_scale_factor = [1, 1, 1]
+init_rpy = [0, 0, 0] # initial roll, pitch, yaw (deg)
 
 # Plotting
 plot_results = True

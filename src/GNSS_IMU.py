@@ -171,9 +171,11 @@ LC_KF_Config.init = cfg.init
 LC_KF_Config.init.att_unc = np.deg2rad(cfg.init.att_unc)
 LC_KF_Config.init.bias_gyro_unc = np.deg2rad(cfg.init.bias_gyro_unc)
 
-# lever arm
-r_lever_arm_b = np.array(cfg.gnss_offset) - np.array(cfg.imu_offset)
-LC_KF_config.r_lever_arm_b = r_lever_arm_b   # lever arm in body frame
+# lever arm in body frame
+if cfg.yaw_align:
+    LC_KF_Config.r_lever_arm_b = np.array([0, 0, 0])  # ignore lever arm if yaw is not aligned
+else:
+    LC_KF_Config.r_lever_arm_b = np.array(cfg.gnss_offset) - np.array(cfg.imu_offset)
 
 # Load input measurements
 in_gnss, num_gnss, ok = Read_GNSS_data(join(dataDir, 'gnss_%s.pos' % fileIn ))
@@ -238,7 +240,7 @@ for p in range(npasses):
     est_v_eb_n = in_gnss[0, 14:17]  # initial NED velocity
     r_gnss_e, v_gnss_e, est_C_b_e =  pvc_LLH_to_ECEF(est_L_b, est_lambda_b, 
             est_h_b, est_v_eb_n, est_C_b_n)
-    est_v_eb_e, est_r_eb_e = Lever_Arm(est_C_b_e, v_gnss_e, r_gnss_e, [0,0,0], - r_lever_arm_b)
+    est_v_eb_e, est_r_eb_e = Lever_Arm(est_C_b_e, v_gnss_e, r_gnss_e, [0,0,0], - LC_KF_Config.r_lever_arm_b)
     prev_time = start_time = t_imu[0]
     
     # Calculate earth radius and gravity for starting location
@@ -272,7 +274,7 @@ for p in range(npasses):
     
     # Init internal states
     vel_match_flag = False
-    yaw_aligned = False
+    yaw_aligned = not cfg.yaw_align  # Init yaw as unaligned if yaw align option is enabled
 
     # Loop through IMU epocs
     for epoch in range(num_epochs):
@@ -311,11 +313,30 @@ for p in range(npasses):
     
         # Check for next GNSS measurement
         while time * run_dir >= time_next_GNSS * run_dir:
+            # Get next GNSS measurement
             GNSS_epoch += 1   
             in_gnss_ptr += gnss_epoch_inc
+            GNSS_L_b, GNSS_lambda_b, GNSS_h_b = in_gnss[in_gnss_ptr, 1:4]    # LLI position
+            pos_meas_SD = in_gnss[in_gnss_ptr,6:9] * cfg.gnss_noise_factors[0] # pos uncertainty
+            vel_meas_SD = in_gnss[in_gnss_ptr,17:20] * cfg.gnss_noise_factors[1] #vel uncertainty
+            v_gnss_n = in_gnss[in_gnss_ptr, 14:17]  # NED velocity
+            r_gnss_e, v_gnss_e, _ = pvc_LLH_to_ECEF(GNSS_L_b, GNSS_lambda_b, 
+                    GNSS_h_b, v_gnss_n, np.zeros((3,3)))
+            time_GNSS = time_next_GNSS
             
-            # Process measurement if not in coast mode
-            if coast == 0: 
+            # Align yaw first time velocity is large enough to calculate heading
+            if cfg.yaw_align and not yaw_aligned:
+                if norm(v_gnss_n[:2]) > cfg.yaw_align_min_vel and fix[in_gnss_ptr] == FIX :  # check forward velocity
+                    print('   %.2f sec: Yaw align: ' % (time - t_gnss[0]), end='')
+                    est_C_b_e = Align_Yaw(est_C_b_e, est_C_b_n, v_gnss_n, run_dir)
+                    LC_KF_config.r_lever_arm_b = np.array(cfg.gnss_offset) - np.array(cfg.imu_offset)
+                    est_v_eb_e, est_r_eb_e = Lever_Arm(est_C_b_e, v_gnss_e, r_gnss_e, 
+                                            [0,0,0], -LC_KF_config.r_lever_arm_b)
+                    if norm(v_gnss_n[:2]) > cfg.yaw_align_max_vel:
+                        yaw_aligned = True  # disable any further yaw alignment
+            
+            # Process measurement if not in coast mode and yaw is aligned
+            if coast == 0: # and yaw_aligned: 
                 # Adjust measurement uncertainty based on fix status
                 if fix[in_gnss_ptr] == FIX or cfg.disable_imu:
                     noise_gain = 1
@@ -325,14 +346,8 @@ for p in range(npasses):
                     noise_gain = cfg.single_err_gain
                     
                 if noise_gain != 0:  # skip measurement if noise_gain set to zero
-                    # Get next GNSS measurement
-                    GNSS_L_b, GNSS_lambda_b, GNSS_h_b = in_gnss[in_gnss_ptr, 1:4]    # LLI position
-                    GNSS_v_eb_n = in_gnss[in_gnss_ptr, 14:17]  # NED velocity
-                    pos_meas_SD = in_gnss[in_gnss_ptr,6:9] * cfg.gnss_noise_factors[0] * noise_gain
-                    vel_meas_SD = in_gnss[in_gnss_ptr,17:20] * cfg.gnss_noise_factors[1] * noise_gain
-                    GNSS_r_eb_e, GNSS_v_eb_e, _ = pvc_LLH_to_ECEF(GNSS_L_b, GNSS_lambda_b, 
-                            GNSS_h_b, GNSS_v_eb_n, np.zeros((3,3)))
-                    time_GNSS = time_next_GNSS
+                    pos_meas_SD *= noise_gain
+                    vel_meas_SD *= noise_gain
                     
                     # record last fix, used for velocity matching
                     if fix[in_gnss_ptr] == FIX:
@@ -347,18 +362,10 @@ for p in range(npasses):
                     
                     # Run GNSS Measurement Update for Kalman Filter
                     est_C_b_e, est_v_eb_e, est_r_eb_e, est_IMU_bias, P = LC_KF_GNSS_Update(
-                        GNSS_r_eb_e, GNSS_v_eb_e, pos_meas_SD, vel_meas_SD, est_C_b_e, est_v_eb_e,
+                        r_gnss_e, v_gnss_e, pos_meas_SD, vel_meas_SD, est_C_b_e, est_v_eb_e,
                         est_r_eb_e, est_IMU_bias, P, meas_f_ib_b, meas_omega_ib_b,
                         LC_KF_config)
-                    
-                    # Align yaw first time velocity is large enough to calculate heading
-                    if cfg.yaw_align and not yaw_aligned:
-                        if norm(est_v_eb_e) > cfg.yaw_align_min_vel and fix[in_gnss_ptr] == FIX :  # check forward velocity
-                            print('   %.2f sec: Yaw align: ' % (time - t_gnss[0]), end='')
-                            _, _, _, _, est_C_b_n = pvc_ECEF_to_LLH(est_r_eb_e, est_v_eb_e, est_C_b_e)
-                            est_C_b_e  = Align_Yaw(est_C_b_e, est_C_b_n, GNSS_v_eb_n, run_dir)
-                            yaw_aligned = True  # just do once to initialize yaw
-                                                    
+
             # Generate KF uncertainty and IMU bias output records
             out_IMU_bias_est[GNSS_epoch, 0, p] = time
             out_KF_SD[GNSS_epoch, 0, p] = time
@@ -391,7 +398,7 @@ for p in range(npasses):
                 #    print('   ZUPT update:%.1f: ' %  (time-t_gnss[0]), np.rad2deg(temp[3:6]), '->', np.rad2deg(est_IMU_bias[3:6]))
 
         # Do non-holonomic update if driving straight and level
-        if cfg.nhc_enable:
+        if cfg.nhc_enable and yaw_aligned:
             ok = (abs(meas_omega_ib_b[2]) < np.deg2rad(cfg.nhc_gyro_thesh)) and norm(est_v_eb_e) > cfg.nhc_min_vel
             nhc_count = nhc_count + 1 if ok else 0
             if nhc_count == cfg.nhc_epcoh_count:
@@ -406,7 +413,7 @@ for p in range(npasses):
         est_C_b_e = ortho_C(est_C_b_e)
         
         # Calculate position, velocity at GNSS antenna and system origin for output profile
-        est_v_gnss_e, est_r_gnss_e = Lever_Arm(est_C_b_e, est_v_eb_e, est_r_eb_e, meas_omega_ib_b, r_lever_arm_b)
+        est_v_gnss_e, est_r_gnss_e = Lever_Arm(est_C_b_e, est_v_eb_e, est_r_eb_e, meas_omega_ib_b, LC_KF_Config.r_lever_arm_b)
         est_v_ref_e, est_r_ref_e = Lever_Arm(est_C_b_e, est_v_eb_e, est_r_eb_e, meas_omega_ib_b, -np.array(cfg.imu_offset))
         
         # Calculate velocity in body frame at system origin for output profile
@@ -421,7 +428,7 @@ for p in range(npasses):
         elif cfg.out_frame == 'origin':
             outp[epoch, 1:4, p] = est_r_ref_e # ECEF
             outp[epoch, 4:7, p] = est_v_ref_e # ECEF
-        else:  
+        else:    # 'imu'
             outp[epoch, 1:4, p] = est_r_eb_e # est_r_eb_e   # ECEF
             outp[epoch, 4:7, p] = est_v_eb_e # est_v_eb_e   # ECEF
         outp[epoch, 7:10, p] = CTM_to_Euler(est_C_b_n.T).flatten() 
