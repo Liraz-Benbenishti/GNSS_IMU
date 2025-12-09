@@ -169,9 +169,8 @@ def Radii_of_curvature(L):
 def Lever_Arm(C_b2f, v_ref_f, r_ref_f, omega_ib_b, r_lever_arm_b):
     r_lever_arm_f = C_b2f @ r_lever_arm_b
     v_lever_arm_f = C_b2f @ np.cross(omega_ib_b, r_lever_arm_b)
-    v_centripetal_f = C_b2f @ np.cross(omega_ib_b, np.cross(omega_ib_b, r_lever_arm_b))
     r_point_f = r_ref_f + r_lever_arm_f
-    v_point_f = v_ref_f + v_lever_arm_f - v_centripetal_f
+    v_point_f = v_ref_f + v_lever_arm_f
     return(v_point_f, r_point_f)
 
 def ortho_C(C: np.ndarray) -> np.ndarray:
@@ -316,7 +315,7 @@ def LC_KF_Predict(tor_s, est_C_b_e, est_v_eb_e, est_r_eb_e, est_IMU_bias, P, Qc,
         Phi[3:6, 15:18] = est_C_b_e @ np.diag(meas_f_ib_b) * tor_s
         Phi[0:3, 18:21] = est_C_b_e @ np.diag(meas_omega_ib_b) * tor_s
 
-    #2. Discretize: Q'  Qc * dt
+    #2. Discretize: Q' = Qc * dt
     Q_prime = Qc * abs_tor_s
 
     # 3. Propagate state estimates using (3.14) noting that all states are zero 
