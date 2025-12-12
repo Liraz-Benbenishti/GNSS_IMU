@@ -39,7 +39,7 @@ gnss_offset = [0, 0.05, -0.65]  # offset from system origin: forward, right, dow
 mag_enable = False
 
 # ratio of specs to process noise stdevs to account for unmodeled errors
-imu_noise_factors = [1, 2, 4, 2, 0.25, 0.25]  # attitude, velocity, accel bias, gyro bias, accel scale, gyro scale
+imu_noise_factors = [1, 1, 1, 1, 1, 1]  # attitude, velocity, accel bias, gyro bias, accel scale, gyro scale
 gnss_noise_factors = [1, 1]  # position, velocity
 
 # Initial uncertainties
@@ -68,7 +68,7 @@ vel_match_min_t = 1 # min GNSS outage to invoke vel match (seconds)
 
 # Zero Velocity update
 zupt_enable = True
-zupt_epcoh_count = 50
+zupt_epoch_count = 50
 zupt_accel_thresh = 0.25  # m/sec^2
 zupt_gyro_thresh = 0.25  # deg/sec
 zupt_vel_SD = 0.01     # standard dev (m/sec)
@@ -82,7 +82,7 @@ init_yaw_with_mag = False
 
 # Non-holomonic constrains (NHC) update
 nhc_enable = False
-nhc_epcoh_count = 100
+nhc_epoch_count = 100
 nhc_min_vel = 1.0
 nhc_gyro_thesh = 20 # deg/sec
 nhc_vel_SD = .25 # standard dev m/sec 

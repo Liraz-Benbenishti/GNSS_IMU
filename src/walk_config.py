@@ -22,7 +22,7 @@ import numpy as np
 # IMU parameters
 imu_config = 'PSD'  # 'PSD' or 'random_walk'
 imu_sample_rate = 100
-imu_offset   = [0, -0.05, 0]  # offset from system origin:  N, E, D (m)
+imu_offset   = [0, 0, 0]  # offset from system origin:  N, E, D (m)
 gyro_noise_PSD =  0.0038  # deg/sec/sqrt (Hz)
 accel_noise_PSD = 70    # ug/sqrt (Hz)
 accel_bias_PSD = 7  # ug/sqrt (Hz)
@@ -32,18 +32,18 @@ gyro_scale_noise_SD = 3.8e-6
 imu_misalign = np.array([180.0, 0.0, -90.0])   # IMU orientation (deg rpy)
 
 # GNSS parameters 
-gnss_offset = [0, 0, 0]  # offset from system origin: forward, right, down (m)
+gnss_offset = [0,0.05, 0]  # offset from system origin: forward, right, down (m)
 
 # Magnetometer parameters
 mag_enable = False
 
 # ratio of specs to process noise stdevs to account for unmodeled errors
-imu_noise_factors = [4, 4, 4, 4, 1, 0.25]  # attitude, velocity, accel bias, gyro bias, accel scale, gyro scale
+imu_noise_factors = [1, 1, 1, 1, 1, 1]  # attitude, velocity, accel bias, gyro bias, accel scale, gyro scale
 gnss_noise_factors = [1, 1]  # position, velocity
 
 # Initial uncertainties
 init =Init()
-init.att_unc = [10, 10, 10]   # initial attitude uncertainty per axis in (deg)
+init.att_unc = [10, 10, 100]   # initial attitude uncertainty per axis in (deg)
 init.vel_unc = [0.05, 0.05, 0.1]  # initial velocity uncertainty per axis (m/s)
 init.pos_unc = [0.05, 0.05, 0.1]  # initial position uncertainty per axis (m)
 init.bias_acc_unc = 0.1 # initial accel bias uncertainty (m/sec^2)
@@ -62,12 +62,12 @@ float_err_gain = 2 # mulitplier on pos/vel stdevs if in float mode
 single_err_gain = 5  # mulitplier on pos/vel stdevs if in single mode
 
 # Velocity matching
-vel_match = True  # do velocity matching at end of coast
+vel_match = False  # do velocity matching at end of coast
 vel_match_min_t = 1 # min GNSS outage to invoke vel match (seconds)
 
 # Zero Velocity update
 zupt_enable = True
-zupt_epcoh_count = 50
+zupt_epoch_count = 50
 zupt_accel_thresh = 0.25  # m/sec^2
 zupt_gyro_thresh = 0.25  # deg/sec
 zupt_vel_SD = 0.01     # standard dev (m/sec)
@@ -81,7 +81,7 @@ init_yaw_with_mag = False
 
 # Non-holomonic constrains (NHC) update
 nhc_enable = False
-nhc_epcoh_count = 100
+nhc_epoch_count = 100
 nhc_min_vel = 1.0
 nhc_gyro_thesh = 20 # deg/sec
 nhc_vel_SD = .25 # standard dev m/sec 
@@ -89,8 +89,8 @@ nhc_vel_SD_coast = 0.05 # standard dev m/sec
 
 # Testing/Debug
 disable_imu = False  # enable to Run GNSS only
-start_coast = 25   # start of simulated GNSS outages (secs)
-end_coast = 45 # end of simulated GNSS outages (secs before end)
+start_coast = 40   # start of simulated GNSS outages (secs)
+end_coast = 10 # end of simulated GNSS outages (secs before end)
 coast_len = 15 # length of simulated  GNSS outages (secs)
 num_epochs = 0  # num epochs to run (0=all)
 gyro_bias_err = [0, 0, 0]  # Add constant error to gyro biases (deg/sec)

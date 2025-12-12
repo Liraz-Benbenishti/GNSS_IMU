@@ -335,20 +335,25 @@ for p in range(npasses):
                     if norm(v_gnss_n[:2]) > cfg.yaw_align_max_vel:
                         yaw_aligned = True  # disable any further yaw alignment
             
-            # Process measurement if not in coast mode and yaw is aligned
+            # Process GNSS measurement if not in coast mode and yaw is aligned
             if coast == 0: # and yaw_aligned: 
                 # Adjust measurement uncertainty based on fix status
                 if fix[in_gnss_ptr] == FIX or cfg.disable_imu:
                     noise_gain = 1
                 elif fix[in_gnss_ptr] == FLOAT: 
                     noise_gain = cfg.float_err_gain
-                elif fix[in_gnss_ptr] == SINGLE: 
+                else: # SINGLE: 
                     noise_gain = cfg.single_err_gain
                     
                 if noise_gain != 0:  # skip measurement if noise_gain set to zero
                     pos_meas_SD *= noise_gain
                     vel_meas_SD *= noise_gain
-                    
+
+                    # Run GNSS Measurement Update for Kalman Filter
+                    est_C_b_e, est_v_eb_e, est_r_eb_e, est_IMU_bias, P = LC_KF_GNSS_Update(
+                        r_gnss_e, v_gnss_e, pos_meas_SD, vel_meas_SD, est_C_b_e, est_v_eb_e,
+                        est_r_eb_e, est_IMU_bias, P, meas_omega_ib_b, LC_KF_config)
+
                     # record last fix, used for velocity matching
                     if fix[in_gnss_ptr] == FIX:
                         prev_time_GNSS_fix = time_GNSS_fix
@@ -360,12 +365,6 @@ for p in range(npasses):
                     if cfg.vel_match and fix[in_gnss_ptr]  == 1 and outp[epoch-1,10,p] == 1:
                         vel_match_flag = True
                     
-                    # Run GNSS Measurement Update for Kalman Filter
-                    est_C_b_e, est_v_eb_e, est_r_eb_e, est_IMU_bias, P = LC_KF_GNSS_Update(
-                        r_gnss_e, v_gnss_e, pos_meas_SD, vel_meas_SD, est_C_b_e, est_v_eb_e,
-                        est_r_eb_e, est_IMU_bias, P, meas_f_ib_b, meas_omega_ib_b,
-                        LC_KF_config)
-
             # Generate KF uncertainty and IMU bias output records
             out_IMU_bias_est[GNSS_epoch, 0, p] = time
             out_KF_SD[GNSS_epoch, 0, p] = time
@@ -388,9 +387,9 @@ for p in range(npasses):
                 sum_gyro = meas_omega_ib_b  # reset filter sum
             elif stationary_count > 1:
                 sum_gyro += meas_omega_ib_b # else add to filter sum
-            if stationary_count == cfg.zupt_epcoh_count:
+            if stationary_count == cfg.zupt_epoch_count:
                 temp = est_IMU_bias.copy()
-                mean_gyro = sum_gyro / cfg.zupt_epcoh_count
+                mean_gyro = sum_gyro / cfg.zupt_epoch_count
                 est_C_b_e, est_v_eb_e, est_IMU_bias, P = LC_KF_ZUPT_Update(est_C_b_e, 
                     est_v_eb_e, mean_gyro, est_IMU_bias, P, LC_KF_config, run_dir)
                 stationary_count = 0
@@ -401,7 +400,7 @@ for p in range(npasses):
         if cfg.nhc_enable and yaw_aligned:
             ok = (abs(meas_omega_ib_b[2]) < np.deg2rad(cfg.nhc_gyro_thesh)) and norm(est_v_eb_e) > cfg.nhc_min_vel
             nhc_count = nhc_count + 1 if ok else 0
-            if nhc_count == cfg.nhc_epcoh_count:
+            if nhc_count == cfg.nhc_epoch_count:
                 v = est_v_eb_e
                 est_C_b_e, est_v_eb_e, est_IMU_bias, P = LC_KF_NHC_Update(est_C_b_e, est_v_eb_e, meas_omega_ib_b, -np.array(cfg.imu_offset),
                                       est_IMU_bias, P, LC_KF_config, coast)

@@ -117,11 +117,11 @@ def Init_Qc_matrix_random_walk(cfg, ns):
     # Build continuous-time kalman process noise variances matrix (Qc)
 
     tau = cfg.corr_time * 3600.0 # Correlation time tau in seconds
-    gyro_arw = np.deg2rad(cfg.gyro_arw) / np.sqrt(3600.0)  # deg/sqrt(h) -> rad/s/sqrt(s)
-    acc_vrw = cfg.acc_vrw / np.sqrt(3600.0) # m/s/sqrt(h) -> m/s/sqrt(s)
-    gyro_bias_std = np.deg2rad(cfg.gyro_bias_std) / 3600.0 # deg/h -> rad/s
-    acc_bias_std = cfg.acc_bias_std * 1e-5 # mGal -> m/s^2,  1 Gal = 0.01 m/s^2
-    
+    gyro_arw = cfg.imu_noise_factors[0] * np.deg2rad(cfg.gyro_arw) / np.sqrt(3600.0)  # deg/sqrt(h) -> rad/s/sqrt(s)
+    acc_vrw = cfg.imu_noise_factors[1] * cfg.acc_vrw / np.sqrt(3600.0) # m/s/sqrt(h) -> m/s/sqrt(s)
+    acc_bias_std = cfg.imu_noise_factors[2] * cfg.acc_bias_std * 1e-5 # mGal -> m/s^2,  1 Gal = 0.01 m/s^2
+    gyro_bias_std = cfg.imu_noise_factors[3] * np.deg2rad(cfg.gyro_bias_std) / 3600.0 # deg/h -> rad/s
+
     Qc = np.zeros((ns, ns))
     Qc[0:3, 0:3] = (gyro_arw ** 2) * np.eye(3) # White gyro noise driving attitude error (δθ): gyrarw^2
     Qc[3:6, 3:6] = (acc_vrw ** 2) * np.eye(3) # White accel noise driving velocity error (δv): accvrw^2
@@ -329,7 +329,7 @@ def LC_KF_Predict(tor_s, est_C_b_e, est_v_eb_e, est_r_eb_e, est_IMU_bias, P, Qc,
 
 def LC_KF_GNSS_Update(GNSS_r_eb_e, GNSS_v_eb_e, pos_meas_SD, vel_meas_SD,
                 est_C_b_e, est_v_eb_e, est_r_eb_e, est_IMU_bias,
-                P_propagated, meas_f_ib_b, meas_omega_ib_b, LC_KF_config):
+                P_propagated, meas_omega_ib_b, LC_KF_config):
 
     # Propagated state estimates are all zero due to closed-loop correction.
     ns = LC_KF_config.nstates
@@ -355,12 +355,12 @@ def LC_KF_GNSS_Update(GNSS_r_eb_e, GNSS_v_eb_e, pos_meas_SD, vel_meas_SD,
                                            LC_KF_config.r_lever_arm_b)
 
     # Formulate measurement innovations using (14.102)
-    delta_z = np.zeros((6, 1))
-    delta_z[0:3, 0] = GNSS_r_eb_e - est_r_gnss_e
-    delta_z[3:6, 0] = GNSS_v_eb_e - est_v_gnss_e
+    delta_z = np.zeros(6)
+    delta_z[0:3] = GNSS_r_eb_e - est_r_gnss_e
+    delta_z[3:6] = GNSS_v_eb_e - est_v_gnss_e
     
     # Update state estimates using (3.24)
-    x_est_new = x_est_propagated + K @ delta_z
+    x_est_new = x_est_propagated + K @ delta_z[:,None]
     
     # 10. Update state estimation error covariance matrix using (3.25)
     P_new = (np.eye(ns) - K @ H) @ P_propagated
