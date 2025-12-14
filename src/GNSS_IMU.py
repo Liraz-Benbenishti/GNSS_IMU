@@ -44,6 +44,13 @@ import drive_config as cfg
 dataDir = r'..\data\drive_0708'
 fileIn = '1934_sf'
 
+# Uncomment these lines to run a KF-GINS sample data set.  See convert_KF_GINS_files.py for 
+# instructions
+#import ADIS16465_config as cfg
+#dataDir = r'..\data\KF_GINS'
+#fileIn = 'ADIS16465_sf'
+
+
 ######### Description of inputs/outputs ########################################
 
 # Inputs:
@@ -335,8 +342,8 @@ for p in range(npasses):
                     if norm(v_gnss_n[:2]) > cfg.yaw_align_max_vel:
                         yaw_aligned = True  # disable any further yaw alignment
             
-            # Process GNSS measurement if not in coast mode and yaw is aligned
-            if coast == 0: # and yaw_aligned: 
+            # Process GNSS measurement if not in coast mode
+            if coast == 0:
                 # Adjust measurement uncertainty based on fix status
                 if fix[in_gnss_ptr] == FIX or cfg.disable_imu:
                     noise_gain = 1
