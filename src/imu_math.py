@@ -71,6 +71,7 @@ def Init_P_matrix(LC_KF_config, C_e_n):
     #     .init.pos_unc           Initial position uncertainty per axis (m)
     #     .init.bias_acc_unc      Initial accel. bias uncertainty (m/s^2)
     #     .init.bias_gyro_unc     Initial gyro. bias uncertainty (rad/s)
+    #      C_e_n                     ECEF to NED CTM
     #
     # Outputs:
     #   P_matrix              state estimation error covariance matrix
@@ -79,9 +80,9 @@ def Init_P_matrix(LC_KF_config, C_e_n):
     ns = LC_KF_config.nstates
     P = np.zeros((ns, ns))
     
-    P[0:3, 0:3] = C_e_n @ (np.eye(3) * np.array(LC_KF_config.init.att_unc)**2) @ C_e_n.T
-    P[3:6, 3:6] = C_e_n @ (np.eye(3) * np.array(LC_KF_config.init.vel_unc)**2) @ C_e_n.T
-    P[6:9, 6:9] = C_e_n @ (np.eye(3) * np.array(LC_KF_config.init.pos_unc)**2) @ C_e_n.T
+    P[0:3, 0:3] = C_e_n.T @ (np.eye(3) * np.array(LC_KF_config.init.att_unc)**2) @ C_e_n
+    P[3:6, 3:6] = C_e_n.T @ (np.eye(3) * np.array(LC_KF_config.init.vel_unc)**2) @ C_e_n
+    P[6:9, 6:9] = C_e_n.T @ (np.eye(3) * np.array(LC_KF_config.init.pos_unc)**2) @ C_e_n
     P[9:12, 9:12] = np.eye(3) * np.array(LC_KF_config.init.bias_acc_unc)**2
     P[12:15, 12:15] = np.eye(3) *np.array(LC_KF_config.init.bias_gyro_unc)**2
     if ns == 21:  # Scale factors
@@ -328,7 +329,7 @@ def LC_KF_Predict(tor_s, est_C_b_e, est_v_eb_e, est_r_eb_e, est_IMU_bias, P, Qc,
     return(P_propagated)
 
 def LC_KF_GNSS_Update(GNSS_r_eb_e, GNSS_v_eb_e, pos_meas_SD, vel_meas_SD,
-                est_C_b_e, est_v_eb_e, est_r_eb_e, est_IMU_bias,
+                est_C_b_e, C_n_e, est_v_eb_e, est_r_eb_e, est_IMU_bias,
                 P_propagated, meas_omega_ib_b, LC_KF_config):
 
     # Propagated state estimates are all zero due to closed-loop correction.
@@ -340,12 +341,10 @@ def LC_KF_GNSS_Update(GNSS_r_eb_e, GNSS_v_eb_e, pos_meas_SD, vel_meas_SD,
     H[0:3, 6:9] = -np.eye(3)  # position meas to position states 
     H[3:6, 3:6] = -np.eye(3)  # velocity meas to velocity states
     
-    # 6. Set-up measurement noise covariance matrix assuming all components of
-    # GNSS position and velocity are independent and have equal variance.
+    # 6. Set-up measurement noise covariance matrix and rotate from NED to ECEF
     R = np.zeros((6, 6))
-    # Use same value for X,Y, and Z
-    R[0:3, 0:3] = np.eye(3) * pos_meas_SD**2
-    R[3:6, 3:6] = np.eye(3) * vel_meas_SD**2
+    R[0:3, 0:3] = C_n_e @ (np.eye(3) * np.array(pos_meas_SD)**2) @ C_n_e.T
+    R[3:6, 3:6] = C_n_e @ (np.eye(3) * np.array(vel_meas_SD)**2) @ C_n_e.T
 
     # Calculate Kalman gain using (3.21)
     K = P_propagated @ H.T @ inv(H @ P_propagated @ H.T + R)

@@ -328,8 +328,9 @@ for p in range(npasses):
             pos_meas_SD = in_gnss[in_gnss_ptr,6:9] * cfg.gnss_noise_factors[0] # pos uncertainty
             vel_meas_SD = in_gnss[in_gnss_ptr,17:20] * cfg.gnss_noise_factors[1] #vel uncertainty
             v_gnss_n = in_gnss[in_gnss_ptr, 14:17]  # NED velocity
-            r_gnss_e, v_gnss_e, _ = pvc_LLH_to_ECEF(GNSS_L_b, GNSS_lambda_b, 
-                    GNSS_h_b, v_gnss_n, np.zeros((3,3)))
+            r_gnss_e, v_gnss_e, est_C_b_n = pvc_LLH_to_ECEF(GNSS_L_b, GNSS_lambda_b, 
+                    GNSS_h_b, v_gnss_n, est_C_b_e)
+            est_C_n_e =est_C_b_n @ est_C_b_e.T
             
             # Align yaw first time velocity is large enough to calculate heading
             if cfg.yaw_align and not yaw_aligned:
@@ -358,7 +359,7 @@ for p in range(npasses):
 
                     # Run GNSS Measurement Update for Kalman Filter
                     est_C_b_e, est_v_eb_e, est_r_eb_e, est_IMU_bias, P = LC_KF_GNSS_Update(
-                        r_gnss_e, v_gnss_e, pos_meas_SD, vel_meas_SD, est_C_b_e, est_v_eb_e,
+                        r_gnss_e, v_gnss_e, pos_meas_SD, vel_meas_SD, est_C_b_e, est_C_n_e, est_v_eb_e,
                         est_r_eb_e, est_IMU_bias, P, meas_omega_ib_b, LC_KF_config)
 
                     # record last GNSS measurement, used for velocity matching
