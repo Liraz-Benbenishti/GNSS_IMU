@@ -16,7 +16,6 @@ gnss_in_file = 'gnss_ADIS16465_sf.pos'
 sol_file = 'gnss_imu_ADIS16465_sf.pos'
 wuhan_sol_file= 'NavResult_GNSSVEL.nav'
 
-#r_lever_arm_b = np.array([-0.37, -0.008, 0.353])  # forward, right, down
 r_lever_arm_b = np.array([-0.37, -0.008, 0.353])  # forward, right, down
 title = 'ADIS16465'
 
@@ -108,14 +107,29 @@ axes[0].plot(t_truth[:n] - t_sol[0], pos_sol_n_resamp[:n], '.-')
 axes[0].plot(t_truth[:n] - t_sol[0], pos_wsol_n_resamp[:n], '.-')
 axes[1].plot(t_gnss[:n] - t_sol[0], pos_truth_lev_n[:n], '.')
 axes[1].plot(t_gnss[:n] - t_sol[0], pos_gnss_n[:n], '.')
-axes[0].set_title('Positions')
-axes[1].set_title('Positions')
-axes[0].legend(['NT', 'ET', 'DT', 'NS', 'ES', 'DS', 'NW', 'EW', 'DW'])
-axes[1].legend(['NTL', 'ETL', 'DTL', 'NG', 'EG', 'DG'])
+axes[0].legend(['N_Truth', 'E_Truth', 'D_Truth', 'N_Sol', 'E_Sol', 'D_Sol', 'N_GINS', 'E_GINS', 'D_GINS'])
+axes[1].legend(['N_Truth', 'E_Truth', 'D_Truth', 'N_GNSS', 'E_GNSS', 'D_GNSS'])
 for i in range(2):
     axes[i].grid()
     axes[i].set_xlabel('secs')
     axes[i].set_ylabel('meters')
+    axes[i].set_title('Positions')
+    
+# plot velocities
+fig, axes = plt.subplots(2, 1, figsize=(10, 8), sharex=True)
+fig.suptitle('%s:Velocity errors (NED)' % title)
+axes[0].plot(t_truth[:n] - t_sol[0], vel_truth_n[:n], '.-')
+axes[0].plot(t_truth[:n] - t_sol[0], vel_sol_n_resamp[:n], '.-')
+axes[0].plot(t_truth[:n] - t_sol[0], vel_wsol_n_resamp[:n], '.-')
+axes[1].plot(t_gnss[:n] - t_sol[0], vel_truth_lev_n[:n], '.-')
+axes[1].plot(t_gnss[:n] - t_sol[0], vel_gnss_n[:n], '.-')
+axes[0].legend(['N_Truth', 'E_Truth', 'D_Truth', 'N_Sol', 'E_Sol', 'D_Sol', 'N_GINS', 'E_GINS', 'D_GINS'])
+axes[1].legend(['N_Truth', 'E_Truth', 'D_Truth', 'N_GNSS', 'E_GNSS', 'D_GNSS'])
+for i in range(2):
+    axes[i].grid()
+    axes[i].set_xlabel('secs')
+    axes[i].set_ylabel('meters')
+    axes[i].set_title('Velocities')
 
 # plot position errors
 t_max = min(t_truth[-1],t_sol[-1])
