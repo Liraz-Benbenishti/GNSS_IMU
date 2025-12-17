@@ -274,10 +274,10 @@ for p in range(npasses):
     out_KF_SD[0, 1:ns+1, p] = np.sqrt(np.diag(P))
     
     # Initialize GNSS timing
-    GNSS_epoch = 0  # count of GNSS epochs processed
-    time_GNSS = time_GNSS_fix = t_gnss[0]
+    epoch_GNSS = epoch_GNSS_coast = 0  # count of GNSS epochs processed
+    time_GNSS = time_GNSS_coast = t_gnss[0]
     time_next_GNSS = t_gnss[gnss_epoch_inc]
-    epoch_GNSS_fix = prev_epoch_GNSS_fix = in_gnss_ptr = 0 # ptrs to GNSS input data
+    in_gnss_ptr = 0 # ptr to GNSS input data
     
     # Init internal states
     vel_match_flag = False
@@ -304,7 +304,7 @@ for p in range(npasses):
             meas_f_ib_b *= (1 - est_IMU_bias[6:9])
             meas_omega_ib_b *= (1 - est_IMU_bias[9:12])
 
-        # Update estimated navigation solution unless in IMU coast mode
+        # Update estimated navigation solution unless in IMU disabled mode
         if time * run_dir >= t_gnss[0] * run_dir: # don't run IMU before first GNSS sample
             if not cfg.disable_imu:  # disable IMU for eval only
                 est_r_eb_e, est_v_eb_e, est_C_b_e = Nav_equations_ECEF(
@@ -321,15 +321,15 @@ for p in range(npasses):
         # Check for next GNSS measurement
         while time * run_dir >= time_next_GNSS * run_dir:
             # Get next GNSS measurement
-            GNSS_epoch += 1   
+            epoch_GNSS += 1   
             in_gnss_ptr += gnss_epoch_inc
+            time_GNSS = time_next_GNSS
             GNSS_L_b, GNSS_lambda_b, GNSS_h_b = in_gnss[in_gnss_ptr, 1:4]    # LLI position
             pos_meas_SD = in_gnss[in_gnss_ptr,6:9] * cfg.gnss_noise_factors[0] # pos uncertainty
             vel_meas_SD = in_gnss[in_gnss_ptr,17:20] * cfg.gnss_noise_factors[1] #vel uncertainty
             v_gnss_n = in_gnss[in_gnss_ptr, 14:17]  # NED velocity
             r_gnss_e, v_gnss_e, _ = pvc_LLH_to_ECEF(GNSS_L_b, GNSS_lambda_b, 
                     GNSS_h_b, v_gnss_n, np.zeros((3,3)))
-            time_GNSS = time_next_GNSS
             
             # Align yaw first time velocity is large enough to calculate heading
             if cfg.yaw_align and not yaw_aligned:
@@ -361,22 +361,21 @@ for p in range(npasses):
                         r_gnss_e, v_gnss_e, pos_meas_SD, vel_meas_SD, est_C_b_e, est_v_eb_e,
                         est_r_eb_e, est_IMU_bias, P, meas_omega_ib_b, LC_KF_config)
 
-                    # record last fix, used for velocity matching
-                    if fix[in_gnss_ptr] == FIX:
-                        prev_time_GNSS_fix = time_GNSS_fix
-                        prev_epoch_GNSS_fix = epoch_GNSS_fix
-                        time_GNSS_fix = time_next_GNSS
-                        epoch_GNSS_fix = epoch
+                    # record last GNSS measurement, used for velocity matching
+                    prev_time_GNSS_coast = time_GNSS_coast
+                    prev_epoch_GNSS_coast = epoch_GNSS_coast
+                    time_GNSS_coast = time_GNSS
+                    epoch_GNSS_coast = epoch
                         
-                    # set flag for velocity matching in middle of coast if no fix
-                    if cfg.vel_match and fix[in_gnss_ptr]  == 1 and outp[epoch-1,10,p] == 1:
+                    # set flag for velocity matching if in coast mode
+                    if outp[epoch-1,10,p] == 1:
                         vel_match_flag = True
                     
             # Generate KF uncertainty and IMU bias output records
-            out_IMU_bias_est[GNSS_epoch, 0, p] = time
-            out_KF_SD[GNSS_epoch, 0, p] = time
-            out_IMU_bias_est[GNSS_epoch, 1:nbs + 1, p] = est_IMU_bias
-            out_KF_SD[GNSS_epoch, 1:ns + 1, p] = np.sqrt(np.diag(P))
+            out_IMU_bias_est[epoch_GNSS, 0, p] = time
+            out_KF_SD[epoch_GNSS, 0, p] = time
+            out_IMU_bias_est[epoch_GNSS, 1:nbs + 1, p] = est_IMU_bias
+            out_KF_SD[epoch_GNSS, 1:ns + 1, p] = np.sqrt(np.diag(P))
             
             # Update next GNSS time
             if in_gnss_ptr + gnss_epoch_inc < num_gnss and in_gnss_ptr + gnss_epoch_inc >= 0:
@@ -441,8 +440,8 @@ for p in range(npasses):
         outp[epoch,17:20, p] = v_b
 
         # check for real GNSS outage longer than threshold and flag as coast
-        if coast == 0 and (time - time_GNSS_fix) * run_dir > cfg.vel_match_min_t:
-            #print(epoch, GNSS_epoch, time, time_GNSS, time_next_GNSS, coast)
+        if coast == 0 and (time - time_GNSS_coast) * run_dir > cfg.vel_match_min_t:
+            #print(epoch, epoch_GNSS, time, time_GNSS, time_next_GNSS, coast)
             coast = outp[epoch,10,p] = 1  # mark as coast
             if outp[epoch-1,10,p] == 0:   # if no coast previous epoch
                 i = epoch
@@ -454,8 +453,8 @@ for p in range(npasses):
         # Do velocity matching if required
         if cfg.vel_match:
             if vel_match_flag or (outp[epoch,10,p] == 0 and outp[epoch-1,10,p] == 1):
-                print('Vel match: %.2f-%.2f secs' % (prev_time_GNSS_fix - t_imu[0], time - t_imu[0]))
-                outp[:,:,p] = Velocity_Match(outp[:,:,p], prev_epoch_GNSS_fix, epoch)
+                print('Vel match: %.2f-%.2f secs' % (prev_time_GNSS_coast - t_imu[0], time - t_imu[0]))
+                outp[:,:,p] = Velocity_Match(outp[:,:,p], prev_epoch_GNSS_coast, epoch)
                 vel_match_flag = False
                
         # Update old values
@@ -468,7 +467,7 @@ for p in range(npasses):
         in_gnss, in_imu, outp[:,:,p] = Reverse_Data_Dir(in_gnss, in_imu, outp[:,:,p])
     
     # Plot results
-    ng, ni = GNSS_epoch, num_epochs  # number of GNSS and IMU samples
+    ng, ni = epoch_GNSS, num_epochs  # number of GNSS and IMU samples
     if cfg.plot_results:
         Plot_Results(in_gnss, in_imu[:ni], outp[:,:,p], fileIn, run_dir)
     if cfg.plot_bias_data:
