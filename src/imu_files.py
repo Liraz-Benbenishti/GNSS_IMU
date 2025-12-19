@@ -14,7 +14,7 @@
 """
 
 import numpy as np
-from imu_transforms import pv_ECEF_to_LLH, datetime_to_utc, utc_secs_to_datetime
+from imu_transforms import pv_ECEF_to_GNSS, datetime_to_utc, utc_secs_to_datetime
 from scipy.signal import medfilt
 
 def Read_GNSS_data(filename):
@@ -96,7 +96,7 @@ def Write_GNSS_data(filename, out_profile, out_KF_SD):
     
     # convert position, velocity from ECEF to LLH, NED
     for i in range(len(out_profile)):
-        outg[i,1], outg[i,2], outg[i,3], outg[i,14:17] = pv_ECEF_to_LLH(out_profile[i,1:4], out_profile[i,4:7])
+        outg[i,1], outg[i,2], outg[i,3], outg[i,14:17] = pv_ECEF_to_GNSS(out_profile[i,1:4], out_profile[i,4:7])
         outg[i,16] *= -1  # NED->NEU for RTKLIB format
     
     outg[:,0] = date_time

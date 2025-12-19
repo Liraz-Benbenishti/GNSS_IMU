@@ -89,7 +89,7 @@ def compute_C_e_n(lat, lon):
         [-cphi*clam, -cphi*slam, -sphi]
     ])
 
-def pvc_ECEF_to_LLH(r_eb_e, v_eb_e, C_b_e):
+def pvc_ECEF_to_GNSS(r_eb_e, v_eb_e, C_b_e):
     #ECEF_to_LLH - Converts Cartesian  to curvilinear position, velocity
     #resolving axes from ECEF to NED and attitude from ECEF- to NED-referenced
     # Inputs:
@@ -136,7 +136,7 @@ def pvc_ECEF_to_LLH(r_eb_e, v_eb_e, C_b_e):
 
     return L_b, lambda_b, h_b, v_eb_n, C_b_n
 
-def pvc_LLH_to_ECEF(L_b, lambda_b, h_b, v_eb_n, C_b_n):
+def pvc_GNSS_to_ECEF(L_b, lambda_b, h_b, v_eb_n, C_b_n):
     #LLH_to_ECEF - Converts curvilinear to Cartesian position, velocity
     #resolving axes from NED to ECEF and attitude from NED- to ECEF-referenced
     # Inputs:
@@ -184,8 +184,8 @@ def pvc_LLH_to_ECEF(L_b, lambda_b, h_b, v_eb_n, C_b_n):
 
     return r_eb_e, v_eb_e, C_b_e
 
-def pv_ECEF_to_LLH(r_eb_e, v_eb_e):
-    #pv_ECEF_to_LLH - Converts Cartesian to curvilinear position and velocity
+def pv_ECEF_to_GNSS(r_eb_e, v_eb_e):
+    #pv_ECEF_to_GNSS - Converts Cartesian to curvilinear position and velocity
     #resolving axes from ECEF to NED
     
     # Inputs:
@@ -240,7 +240,7 @@ def ECEF_to_NED(ecef_pos, ecef_vel, ecef_origin):
     """
     
     # Rotation matrix from ECEF to NED
-    lat0, lon0, _, _ = pv_ECEF_to_LLH(ecef_origin, [0,0,0])
+    lat0, lon0, _, _ = pv_ECEF_to_GNSS(ecef_origin, [0,0,0])
     R = compute_C_e_n(lat0, lon0)
     
     # Vector from origin to each point

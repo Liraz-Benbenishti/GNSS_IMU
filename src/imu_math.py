@@ -417,9 +417,10 @@ def LC_KF_ZUPT_Update(est_C_b_e, est_v_eb_e, meas_omega_ib_b,
     
     return(est_C_b_e_new, est_v_eb_e_new, est_IMU_bias_new, P_new)
 
-def Align_Yaw(est_C_b_e, est_C_b_n, GNSS_v_eb_n, run_dir):
+def Align_Yaw(est_C_b_e, C_n_e, GNSS_v_eb_n, run_dir):
     
     # Calculate yaw error in NED
+    est_C_b_n = C_n_e.T @ est_C_b_e # body -> NED
     yaw_est_n = np.arctan2(est_C_b_n[1,0], est_C_b_n[0,0])
     hdg_meas_n = np.arctan2(GNSS_v_eb_n[1], GNSS_v_eb_n[0])
     #delta_yaw_n = (hdg_meas - yaw_est  + np.pi) % (2 * np.pi) - np.pi # Simple
@@ -428,8 +429,7 @@ def Align_Yaw(est_C_b_e, est_C_b_n, GNSS_v_eb_n, run_dir):
     
     # Rotate from NED to ECEF
     R_n = Euler_to_CTM([0, 0, -delta_yaw_n])
-    est_C_n_e = est_C_b_e @ est_C_b_n.T
-    R_e = est_C_n_e @ R_n @ est_C_n_e.T
+    R_e = C_n_e @ R_n @ C_n_e.T
     C_b_e_new = ortho_C(R_e @ est_C_b_e)
    
     return(C_b_e_new)
