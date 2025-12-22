@@ -30,7 +30,7 @@ from imu_math import (Init_P_matrix, Init_Qc_matrix_PSD, Init_Qc_matrix_random_w
                       LC_KF_Config, Velocity_Match, Combine_Passes, Gravity_ECEF, Reverse_Data_Dir)
 from imu_files import Read_GNSS_data, Read_IMU_data, Write_GNSS_data
 from imu_plot import Plot_Results, Plot_Biases, Plot_IMU, Plot_Uncertainties
-from imu_transforms import (CTM_to_Euler, Euler_to_CTM, pvc_GNSS_to_ECEF, pvc_ECEF_to_GNSS, compute_C_e_n)
+from imu_transforms import (CTM_to_Euler, Euler_to_CTM, pvc_GNSS_to_ECEF, compute_C_e_n)
 
 ##########  Data selection and run configuration ########################################
 
@@ -180,8 +180,6 @@ LC_KF_Config.init.bias_gyro_unc = np.deg2rad(cfg.init.bias_gyro_unc)
 
 # lever arm in body frame
 LC_KF_Config.r_lever_arm_b = np.array(cfg.gnss_offset) - np.array(cfg.imu_offset)
-if cfg.yaw_align:
-    LC_KF_Config.r_lever_arm_b[2] = 0  # start with 0 yaw, if yaw is not aligned
 
 # Load input measurements
 in_gnss, num_gnss, ok = Read_GNSS_data(join(dataDir, 'gnss_%s.pos' % fileIn ))
@@ -335,8 +333,7 @@ for p in range(npasses):
             if cfg.yaw_align and not yaw_aligned:
                 if norm(v_gnss_n[:2]) > cfg.yaw_align_min_vel and fix[in_gnss_ptr] == FIX :  # check forward velocity
                     print('   %.2f sec: Yaw align: ' % (time - t_gnss[0]), end='')
-                    est_C_b_e = Align_Yaw(est_C_b_e, C_e_n.T, v_gnss_n, run_dir)
-                    LC_KF_config.r_lever_arm_b[2] = cfg.gnss_offset[2] - cfg.imu_offset[2]
+                    est_C_b_e, P = Align_Yaw(est_C_b_e, C_e_n.T, v_gnss_n, P, run_dir)
                     if norm(v_gnss_n[:2]) > cfg.yaw_align_max_vel:
                         yaw_aligned = True  # disable any further yaw alignment
             

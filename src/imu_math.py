@@ -417,7 +417,7 @@ def LC_KF_ZUPT_Update(est_C_b_e, est_v_eb_e, meas_omega_ib_b,
     
     return(est_C_b_e_new, est_v_eb_e_new, est_IMU_bias_new, P_new)
 
-def Align_Yaw(est_C_b_e, C_n_e, GNSS_v_eb_n, run_dir):
+def Align_Yaw(est_C_b_e, C_n_e, GNSS_v_eb_n, P, run_dir):
     
     # Calculate yaw error in NED
     est_C_b_n = C_n_e.T @ est_C_b_e # body -> NED
@@ -431,8 +431,14 @@ def Align_Yaw(est_C_b_e, C_n_e, GNSS_v_eb_n, run_dir):
     R_n = Euler_to_CTM([0, 0, -delta_yaw_n])
     R_e = C_n_e @ R_n @ C_n_e.T
     C_b_e_new = ortho_C(R_e @ est_C_b_e)
+
+    # Also rotate attitude components of P matrix
+    P[0:3,0:3] = R_e @ P[0:3,0:3]  @ R_e.T
+    P[0:3, 3:] = R_e @ P[0:3,3:]
+    P[3:,0:3] = P[3:,0:3] @ R_e.T
+    P = 0.5 * (P + P.T) # enforce symmetry
    
-    return(C_b_e_new)
+    return(C_b_e_new, P)
 
 # Non-Holonomic Constraint (NHC) Measurement Update
 def LC_KF_NHC_Update(est_C_b_e, est_v_eb_e, meas_omega_ib_b, r_lever_arm_b,est_IMU_bias, P, LC_KF_config, coast):
