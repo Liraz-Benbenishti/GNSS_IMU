@@ -14,8 +14,7 @@
 """
 
 import numpy as np
-from imu_transforms import pv_ECEF_to_GNSS, datetime_to_utc, utc_secs_to_datetime
-from scipy.signal import medfilt
+from imu_transforms import pv_ECEF_to_GNSS, compute_C_e_n, datetime_to_utc, utc_secs_to_datetime
 
 def Read_GNSS_data(filename):
     # Read_GNSS_data in RTKLIB format - inputs GNSS position and velocity data
@@ -82,8 +81,11 @@ def Read_IMU_data(filename):
     return in_imu, no_epochs, ok
 
 def Write_GNSS_data(filename, out_profile, out_KF_SD):
-    hdrg = '%  GPST            latitude(deg) longitude(deg) height(m) Q         ns        sdn(m)    sde(m)    sdu(m)    sdne(m)   sdeu(m)   sdun(m)  age(s)     ratio     vn(m/s)   ve(m/s)    vu(m/s)    sdvn      sdve     sdvu       sdvne    sdveu      sdvun'
-    fmtg = ['%s'] + ['%.7f'] * 25
+    hdrg = '%  GPST           latitude(deg) longitude(deg) height(m)     Q         ns        ' \
+        + 'sdn(m)    sde(m)    sdu(m)    sdne(m)   sdeu(m)   sdun(m)  age(s)     ratio     '  \
+        + 'vn(m/s)   ve(m/s)    vu(m/s)    sdvn      sdve     sdvu       sdvne    sdveu      sdvun  ' \
+        + 'roll(deg)  pitch(deg) yaw(deg)  sdroll     sdpitch   sdyaw'
+    fmtg = ['%s'] + ['%.7f'] * 28
     
     t_gnss = out_profile[:,0]
     coast = out_profile[:,10]
@@ -92,18 +94,21 @@ def Write_GNSS_data(filename, out_profile, out_KF_SD):
     for i, t in enumerate(t_gnss):
         date_time[i] = utc_secs_to_datetime(t)
     
-    outg = np.empty((n,26), dtype=object)
+    outg = np.empty((n,29), dtype=object)
     
     # convert position, velocity from ECEF to LLH, NED
     for i in range(len(out_profile)):
         outg[i,1], outg[i,2], outg[i,3], outg[i,14:17] = pv_ECEF_to_GNSS(out_profile[i,1:4], out_profile[i,4:7])
-        outg[i,16] *= -1  # NED->NEU for RTKLIB format
+        outg[i,16] *= -1  # vel NED->NEU for RTKLIB format
+        outg[i,6:9] = out_profile[i,11:14] # pos stdev NED
+        outg[i,17:20] = out_profile[i,14:17] # vel stdev NED
     
     outg[:,0] = date_time
     outg[:,1:3] = np.rad2deg(outg[:,1:3].astype(float))  # lat/long
     outg[:,4] = 1 + coast    # use fix status for coast
     outg[:,5] = 20   # nsats
-    outg[:,6:14] = 0  # pos covariance
-    outg[:,17:23] = 0 # vel covariance
+    outg[:,9:14] = 0  # pos covariance off-diaganols + age+ ratio
+    outg[:,20:23] = 0 # vel covariance off-diaganols
     outg[:,23:26] = np.rad2deg(out_profile[:,7:10])  # orientation
+    outg[:,26:29] = np.rad2deg(out_profile[:,17:20])  # orientation stdev
     np.savetxt(filename, outg, header=hdrg, encoding='utf-8', fmt=fmtg, delimiter=' ', comments='')

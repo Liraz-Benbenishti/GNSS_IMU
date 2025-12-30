@@ -33,7 +33,7 @@ def Plot_Results(in_gnss, in_imu, out_profile, title, run_dir):
     ecef_pos_out = out_profile[:,1:4]
     ecef_vel_out = out_profile[:,4:7]
     ned_pos_out, ned_vel_out = ECEF_to_NED(ecef_pos_out, ecef_vel_out, ecef_origin)
-    b_vel_out = out_profile[:,17:20]
+    b_vel_out = out_profile[:,20:23]
     
     ned_pos_in_resamp = np.zeros_like(ned_pos_out)
     ned_vel_in_resamp = np.zeros_like(ned_vel_out)

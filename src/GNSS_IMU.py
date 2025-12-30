@@ -108,9 +108,12 @@ fileIn = '1934_sf'
 #  Column 14: stdev: X ECEF velocity (m/s)
 #  Column 15: stdev: Y ECEF velocity (m/s)
 #  Column 16: stdev: Z ECEF velocity (m/s)
-#  Column 17: X body velocity (m/s)
-#  Column 18: Y body velocity (m/s)
-#  Column 19: Z body velocity (m/s)
+#  Column 17: stdev: roll (rad)
+#  Column 18: stdev: pitch (rad)
+#  Column 19: stdev: yaw (rad)
+#  Column 20: X body velocity (m/s)
+#  Column 21: Y body velocity (m/s)
+#  Column 22: Z body velocity (m/s)
 
 #
 # Format of output IMU biases array:
@@ -201,7 +204,7 @@ else:
     num_epochs -= 100  # provide buffer to allow adjusting time offset
     
 # Initialize output arrays
-outp = np.zeros((num_epochs, 20, npasses))
+outp = np.zeros((num_epochs, 23, npasses))
 out_IMU_bias_est = np.zeros((num_gnss, nbs + 1, npasses))
 out_KF_SD = np.zeros((int(num_gnss / cfg.gnss_epoch_step) + 1, ns + 1, npasses))
 
@@ -261,7 +264,7 @@ for p in range(npasses):
     
     # Initialize Kalman filter P matrix and IMU bias states
     C_e_n = compute_C_e_n(est_L_b, est_lambda_b,) # Map to ECEF
-    P = Init_P_matrix(LC_KF_config, C_e_n.T)
+    P = Init_P_matrix(LC_KF_config, C_e_n)
     est_IMU_bias = np.zeros(nbs)
     out_IMU_bias_est[0, 0, p] = prev_time
     out_IMU_bias_est[0, 1:nbs+1, p] = est_IMU_bias
@@ -431,9 +434,12 @@ for p in range(npasses):
         else:    # 'imu'
             outp[epoch, 1:4, p] = est_r_eb_e # est_r_eb_e   # ECEF
             outp[epoch, 4:7, p] = est_v_eb_e # est_v_eb_e   # ECEF
-        outp[epoch, 7:10, p] = CTM_to_Euler(est_C_b_n.T).flatten() 
-        outp[epoch,17:20, p] = v_b
-
+        outp[epoch, 7:10, p] = CTM_to_Euler(est_C_b_n.T).flatten()
+        outp[epoch, 11:14, p] = np.sqrt(np.diag(C_e_n @ P[6:9,6:9] @ C_e_n.T)) # NED pos stdev
+        outp[epoch, 14:17, p] = np.sqrt(np.diag(C_e_n @ P[3:6,3:6] @ C_e_n.T)) # NED vel stdev
+        outp[epoch, 17:20, p] = np.sqrt(np.diag(C_e_n @ P[0:3,0:3] @ C_e_n.T)) # RPY stdev (rad)
+        outp[epoch,20:23, p] = v_b
+        
         # check for real GNSS outage longer than threshold and flag as coast
         if coast == 0 and (time - time_GNSS_coast) * run_dir > cfg.vel_match_min_t:
             #print(epoch, epoch_GNSS, time, time_GNSS, time_next_GNSS, coast)
