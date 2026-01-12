@@ -26,17 +26,15 @@ imu_offset   = [0., 0., -0.65]  # offset from system origin: forward, right, dow
 gyro_noise_PSD =  0.0038  # deg/sec/sqrt(Hz)
 accel_noise_PSD = 70    # ug/sqrt(Hz)
 accel_bias_PSD = 7  # ug/sqrt(Hz)
-gyro_bias_PSD = 3.8e-5   # deg/sec^2/sqrt(Hz)
+gyro_bias_PSD = 3.8e-5   # deg/sec/sqrt(Hz)
 accel_scale_noise_SD = 0.7
 gyro_scale_noise_SD = 3.8e-6
 imu_misalign = np.array([180.0, 0.0, 180.0])   # IMU orientation
-imu_misalign += np.array([0, -6.79, 5.35]) # IMU misalign to body frame (degrees rpy)
+imu_misalign += np.array([-0.29, -6.60, 5.35]) # IMU misalign to body frame (degrees rpy)
 
 # GNSS parameters 
-gnss_offset = [0, 0.05, -0.65]  # offset from system origin: forward, right, down (m)
-
-# Magnetometer parameters
-mag_enable = False
+gnss_offset = [0, -0.05, -0.65]  # offset from system origin: forward, right, down (m)
+gnss_pos_err_thresh = 10 # outlier threshold for max 3D stdev of GNSS position measurmement
 
 # ratio of specs to process noise stdevs to account for unmodeled errors
 imu_noise_factors = [1, 1, 1, 1, 1, 1]  # attitude, velocity, accel bias, gyro bias, accel scale, gyro scale
@@ -44,7 +42,7 @@ gnss_noise_factors = [1, 1]  # position, velocity
 
 # Initial uncertainties
 init =Init()
-init.att_unc = [10, 10, 10]   # initial attitude uncertainty per axis in (deg)
+init.att_unc = [2, 2, 10]   # initial attitude uncertainty per axis in (deg)
 init.vel_unc = [0.05, 0.05, 0.1]  # initial velocity uncertainty per axis (m/s)
 init.pos_unc = [0.05, 0.05, 0.1]  # initial position uncertainty per axis (m)
 init.bias_acc_unc = 0.1 # initial accel bias uncertainty (m/sec^2)
@@ -63,29 +61,31 @@ float_err_gain = 2 # mulitplier on pos/vel stdevs if in float mode
 single_err_gain = 5  # mulitplier on pos/vel stdevs if in single mode
 
 # Velocity matching
-vel_match = True  # do velocity matching at end of coast
+vel_match = False  # do velocity matching at end of coast
 vel_match_min_t = 1 # min GNSS outage to invoke vel match (seconds)
 
 # Zero Velocity update
 zupt_enable = True
-zupt_epoch_count = 50
-zupt_accel_thresh = 0.25  # m/sec^2
-zupt_gyro_thresh = 0.25  # deg/sec
-zupt_vel_SD = 0.01     # standard dev (m/sec)
-zaru_gyro_SD = 0.01   # standard dev (deg/sec)
+zupt_epoch_count = 50 # epochs to average for update
+zupt_accel_thresh = 0.25  # max accel thresh (m/sec^2)
+zupt_gyro_thresh = 0.25  # max ang accel thesh (deg/sec)
+zupt_vel_SD = 0.05     # zero vel update stdev (m/sec)
+zupt_accel_SD = 0.05 # zero vel accelerometer stdev (m/sec/2)
+zaru_gyro_SD = 0.05   # zero angular accel stdev (deg/sec)
 
 # Initial yaw alignment
 yaw_align = True # use GNSS heading to initialize yaw
 yaw_align_min_vel = 0.25  # threshold to start yaw align (m/sec)
-yaw_align_max_vel = 5.0  # threshold to end yaw align (m/sec)
-init_yaw_with_mag = False
+yaw_align_max_vel = 2.0  # threshold to end yaw align (m/sec)
+yaw_align_min_fix_state = 1 # 1=fix, 2=float,5=single
+init_yaw_with_mag = False # use magnetometer to init yaw
 
 # Non-holomonic constrains (NHC) update
 nhc_enable = False
-nhc_epoch_count = 100
-nhc_min_vel = 1.0
-nhc_gyro_thesh = 20 # deg/sec
-nhc_vel_SD = .25 # standard dev m/sec 
+nhc_epoch_count = 20
+nhc_min_vel = 2.0
+nhc_gyro_thesh = 10 # deg/sec
+nhc_vel_SD = 0.10 # standard dev m/sec 
 nhc_vel_SD_coast = 0.05 # standard dev m/sec
 
 # Testing/Debug

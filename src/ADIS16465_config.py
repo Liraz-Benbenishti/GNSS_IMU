@@ -20,7 +20,7 @@ from imu_math import Init
 import numpy as np
 
 # IMU parameters (random walk)
-imu_config = 'random_walk'  # 'PSD' or 'random_walk''
+imu_config = 'random_walk'  # 'PSD' or 'random_walk'
 imu_offset   = [0., 0., 0]  # offset from system origin: forward, right, down
 gyro_arw = 0.1; # gyro angle random walk [deg/sqrt(h)]
 acc_vrw = 0.1; # accel velocity random walk [m/s/sqrt(h)]
@@ -34,12 +34,10 @@ imu_misalign = np.array([0.0, 0.0, 0.0])   # IMU orientation
 
 # GNSS parameters 
 gnss_offset = np.array([-0.37, 0.008, 0.353])  # offset from system origin: forward, right, down (m)
-
-# Magnetometer parameters
-mag_enable = False
+gnss_pos_err_thresh = 10 # outlier threshold for max stdev of GNSS position measurmement (m)
 
 # ratio of specs to process noise stdevs to account for unmodeled errors
-imu_noise_factors = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0] # attitude, velocity, accel bias, gyro bias, accel scale, gyro scale
+imu_noise_factors = [1, 1, 1, 1, 1, 1] # attitude, velocity, accel bias, gyro bias, accel scale, gyro scale
 gnss_noise_factors = [1, 1]  # position, velocity
 
 # Initial uncertainties
@@ -71,29 +69,31 @@ float_err_gain = 0 # mulitplier on pos/vel stdevs if in float mode
 single_err_gain = 0  # mulitplier on pos/vel stdevs if in single mode
 
 # Velocity matching
-vel_match = True # do velocity matching at end of coast
+vel_match = False # do velocity matching at end of coast
 vel_match_min_t = 5 # min GNSS outage to invoke vel match (seconds)
 
 # Zero Velocity update
 zupt_enable = False
-zupt_epoch_count = 50
-zupt_accel_thresh = 0.25  # m/sec^2
-zupt_gyro_thresh = 0.25  # deg/sec
-zupt_vel_SD = 0.01     # standard dev (m/sec)
-zaru_gyro_SD = 0.02   # standard dev (deg/sec)
+zupt_epoch_count = 50 # epochs to average for update
+zupt_accel_thresh = 0.25  # max accel thresh (m/sec^2)
+zupt_gyro_thresh = 0.25  # max ang accel thesh (deg/sec)
+zupt_vel_SD = 0.02     # zero vel update stdev (m/sec)
+zupt_accel_SD = 0.02 # zero vel accelerometer stdev (m/sec^2)
+zaru_gyro_SD = 0.02   # zero angular accel stdev (deg/sec)
 
 # Initial yaw alignment
 yaw_align = False # use GNSS heading to initialize yaw
-yaw_align_min_vel = 0.0  # threshold to start yaw align (m/sec)
-yaw_align_max_vel = 0.5  # threshold to end yaw align (m/sec)
-init_yaw_with_mag = False
+yaw_align_min_vel = 0.25  # threshold to start yaw align (m/sec)
+yaw_align_max_vel = 1.25  # threshold to end yaw align (m/sec)
+yaw_align_min_fix_state = 1 # 1=fix, 2=float,5=single
+init_yaw_with_mag = False # use magnetometer to init yaw
 
 # Non-holomonic constrains (NHC) update
 nhc_enable = False
-nhc_epoch_count = 100
-nhc_min_vel = 1.0
-nhc_gyro_thesh = 20 # deg/sec
-nhc_vel_SD = .25 # standard dev m/sec 
+nhc_epoch_count = 20
+nhc_min_vel = 0.5
+nhc_gyro_thesh = 10 # deg/sec
+nhc_vel_SD = 0.10 # standard dev m/sec 
 nhc_vel_SD_coast = 0.05 # standard dev m/sec
 
 # Testing/Debug
