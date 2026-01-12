@@ -14,7 +14,7 @@
 """
 
 import numpy as np
-from imu_transforms import pv_ECEF_to_GNSS, compute_C_e_n, datetime_to_utc, utc_secs_to_datetime
+from imu_transforms import pv_ECEF_to_GNSS, datetime_to_utc, utc_secs_to_datetime
 
 def Read_GNSS_data(filename):
     # Read_GNSS_data in RTKLIB format - inputs GNSS position and velocity data
@@ -75,7 +75,7 @@ def Read_IMU_data(filename):
     #   no_epochs    Number of epochs of data in the file
     #   ok           Indicates file has the expected number of columns
     
-    in_imu = np.genfromtxt(filename, delimiter=',')
+    in_imu = np.genfromtxt(filename, delimiter=',', comments='%')
     no_epochs, no_columns = in_imu.shape
     ok = True
     return in_imu, no_epochs, ok

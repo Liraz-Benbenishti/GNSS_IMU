@@ -325,7 +325,7 @@ def LC_KF_Predict(tor_s, est_C_b_e, est_v_eb_e, est_r_eb_e, est_IMU_bias, P, Qc,
     
     # 4. Propagate state estimation error covariance matrix using (3.46)
     P_propagated = Phi @ (P + 0.5 * Q_prime) @ Phi.T + 0.5 * Q_prime
-
+    P_propagated = 0.5 * (P_propagated + P_propagated.T) # enforce symmetry
     return(P_propagated)
 
 def LC_KF_GNSS_Update(GNSS_r_eb_e, GNSS_v_eb_e, pos_meas_SD, vel_meas_SD,
@@ -362,7 +362,10 @@ def LC_KF_GNSS_Update(GNSS_r_eb_e, GNSS_v_eb_e, pos_meas_SD, vel_meas_SD,
     x_est_new = x_est_propagated + K @ delta_z[:,None]
     
     # 10. Update state estimation error covariance matrix using (3.25)
-    P_new = (np.eye(ns) - K @ H) @ P_propagated
+    I = np.eye(ns)
+    #P_new = (I - K @ H) @ P_propagated # simple form
+    P_new = (I - K @ H) @ P_propagated @ (I - K @ H).T + K @ R @ K.T # robust form
+    P_new = 0.5 * (P_new + P_new.T) # enforce symmetry
     
     # CLOSED-LOOP CORRECTION
 
@@ -376,31 +379,35 @@ def LC_KF_GNSS_Update(GNSS_r_eb_e, GNSS_v_eb_e, pos_meas_SD, vel_meas_SD,
 
     return(est_C_b_e_new, est_v_eb_e_new, est_r_eb_e_new, est_IMU_bias_new, P_new)
 
-def LC_KF_ZUPT_Update(est_C_b_e, est_v_eb_e, meas_omega_ib_b, 
-                      est_IMU_bias, P_propagated, LC_KF_config, run_dir):
+def LC_KF_ZUPT_Update(est_C_b_e, est_v_eb_e, meas_omega_ib_b, meas_f_ib_b,
+                      est_IMU_bias, P_propagated, LC_KF_config, gravity_e, run_dir):
 
     # Propagated state estimates are all zero due to closed-loop correction.
     ns = LC_KF_config.nstates
     x_est = np.zeros((ns, 1))
+    f_pred_b = -est_C_b_e.T @ gravity_e
     
-    H = np.zeros((6, ns))    
+    H = np.zeros((9, ns))    
     H[0:3, 3:6] = -np.eye(3)     # Velocity meas (0) to velocity states
-    H[0:3, 9:12] = -np.eye(3)    # Velocity meas (0) to accel bias states
     H[3:6, 12:15] = -np.eye(3)    # Gyro bias meas to gyro bias states
-    
+    H[6:9, 0:3] = est_C_b_e.T @ Skew_symmetric(gravity_e) # gravity -> accel
+    H[6:9, 9:12] = -np.eye(3)    # Specific force directly observes accel bias
+
     # Measurement noise covariance R
-    R = np.zeros((6, 6))
+    R = np.zeros((9, 9))
     R[0:3, 0:3] = np.eye(3) * LC_KF_config.zupt_vel_var
     R[3:6, 3:6] = np.eye(3) * LC_KF_config.zaru_gyro_var
+    R[6:9, 6:9] = np.eye(3) * LC_KF_config.zupt_accel_var
     
     # Kalman gain
     K = P_propagated @ H.T @ inv(H @ P_propagated @ H.T + R)
     
     # Measurement innovation (ZUPT: velocity should be zero, ZARU: angular rate should be zero)
-    delta_z = np.zeros((6, 1))
+    delta_z = np.zeros((9, 1))
     delta_z[0:3, 0] = 0 - est_v_eb_e.flatten() * run_dir  # ZUPT: 0 - v_est
     delta_z[3:6, 0] = meas_omega_ib_b.flatten() * run_dir # ZARU: 0 - (omega_measured - bias_est)
-    
+    delta_z[6:9, 0] = (meas_f_ib_b - f_pred_b).flatten() * run_dir
+
     # State update
     x_est_new = x_est + K @ delta_z
     
@@ -408,6 +415,7 @@ def LC_KF_ZUPT_Update(est_C_b_e, est_v_eb_e, meas_omega_ib_b,
     I = np.eye(ns)
     #P_new = (I - K @ H) @ P_propagated # Simple form
     P_new = (I - K @ H) @ P_propagated @ (I - K @ H).T + K @ R @ K.T # More stable form
+    P_new = 0.5 * (P_new + P_new.T) # enforce symmetry
     
     # Closed-loop correction
     est_C_b_e_new = (np.eye(3) - Skew_symmetric(x_est_new[0:3].flatten())) @ est_C_b_e 
@@ -446,10 +454,15 @@ def LC_KF_NHC_Update(est_C_b_e, est_v_eb_e, meas_omega_ib_b, r_lever_arm_b,est_I
     # Propagated state estimates are all zero due to closed-loop correction.
     ns = LC_KF_config.nstates
     x_est = np.zeros((ns, 1))
+    
+    # Transform velocity to body frame
+    v_b = est_C_b_e.T @ est_v_eb_e + np.cross(meas_omega_ib_b, np.array(r_lever_arm_b))
 
     # Measurement matrix H_nhc: maps error state to v_b_y, v_b_z
-    H = np.zeros((2, 15))
-    H[:, 3:6] = -est_C_b_e.T[1:3, :]  # Project ECEF velocity to body Y/Z
+    H = np.zeros((2, ns))
+    H[:, 0:3] = Skew_symmetric(v_b)[1:3, :] # yaw/tilt correction pathway
+    H[:, 3:6] = -est_C_b_e.T[1:3, :]  # project ECEF velocity to body Y/Z
+    H[:, 12:15] = Skew_symmetric(r_lever_arm_b)[1:3, :] # gyro bias correction
     
     # Measurement noise
     if coast:
@@ -460,23 +473,23 @@ def LC_KF_NHC_Update(est_C_b_e, est_v_eb_e, meas_omega_ib_b, r_lever_arm_b,est_I
     # Kalman update
     K = P @ H.T @ inv(H @ P @ H.T + R)
 
-    # Transform velocity to body frame
-    v_b = est_C_b_e.T @ est_v_eb_e + np.cross(meas_omega_ib_b, np.array(r_lever_arm_b))
-    
     delta_z = 0 - v_b[1:3].reshape((2, 1))  # meas - estimated
 
     # State update
     x_est += K @ delta_z
     
     # Covariance update
-    P_new = (np.eye(15) - K @ H) @ P
+    I = np.eye(ns)
+    #P_new = (I - K @ H) @ P # simple form
+    P_new = (I - K @ H) @ P @ (I - K @ H).T + K @ R @ K.T # robust form
+    P_new = 0.5 * (P_new + P_new.T) # enforce symmetry
 
     # Apply closed-loop correction
     est_C_b_e_new = (np.eye(3) - Skew_symmetric(x_est[0:3].flatten())) @ est_C_b_e
     est_v_eb_e_new = est_v_eb_e - x_est[3:6].flatten()
     est_IMU_bias_new = est_IMU_bias.copy()
     est_IMU_bias_new[:6] += x_est[9:15].flatten()
-    #est_IMU_bias_new[5] += x_est[14]
+
     return(est_C_b_e_new, est_v_eb_e_new, est_IMU_bias_new, P_new)
 
 def Velocity_Match(outp, coast_start, coast_end):

@@ -112,7 +112,7 @@ def Plot_Results(in_gnss, in_imu, out_profile, title, run_dir):
     axes[0].plot(t_out, pos_diff, '.-')
     axes[1].plot(t_out, vel_diff, '.-')
     axes[0].legend(['dpos_N: %.3f' % pos_diff_h95[0], 'dpos_E: %.3f' % pos_diff_h95[1], 'dpos_D: %.3f' % pos_diff_h95[2]])
-    axes[1].legend(['dvel_N: %.3f' % vel_diff_h95[0], 'dvel_N: %.3f' % vel_diff_h95[1], 'dvel_N: %.3f' % vel_diff_h95[2]])
+    axes[1].legend(['dvel_N: %.3f' % vel_diff_h95[0], 'dvel_E: %.3f' % vel_diff_h95[1], 'dvel_D: %.3f' % vel_diff_h95[2]])
     axes[0].grid()
     axes[1].grid()
     axes[0].set_title('Position differences')

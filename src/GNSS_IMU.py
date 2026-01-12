@@ -46,9 +46,14 @@ fileIn = '1934_sf'
 
 # Uncomment these lines to run a KF-GINS sample data set.  See convert_KF_GINS_files.py for 
 # instructions
-#import ADIS16465_config as cfg
-#dataDir = r'..\data\KF_GINS'
-#fileIn = 'ADIS16465_sf'
+# import ADIS16465_config as cfg
+# dataDir = r'..\data\KF_GINS'
+# fileIn = 'ADIS16465_sf'
+
+# Tunnel data
+# import tunnel_0105 as cfg
+# dataDir = r'..\data\tunnel_0105'
+# fileIn = '20251224'
 
 
 ######### Description of inputs/outputs ########################################
@@ -171,7 +176,8 @@ else:  # 'random_walk'  # use random walk IMU specs
     Qc = Init_Qc_matrix_random_walk(cfg, ns)
 
 # Calculate kalman measurement noise variances
-LC_KF_config.zupt_vel_var = cfg.zupt_vel_SD**2 
+LC_KF_config.zupt_vel_var = cfg.zupt_vel_SD**2
+LC_KF_config.zupt_accel_var = cfg.zupt_accel_SD**2
 LC_KF_config.zaru_gyro_var = np.deg2rad(cfg.zaru_gyro_SD)**2
 LC_KF_config.nhc_vel_var = cfg.nhc_vel_SD**2
 LC_KF_config.nhc_vel_var_coast = cfg.nhc_vel_SD_coast**2
@@ -334,11 +340,12 @@ for p in range(npasses):
             
             # Align yaw first time velocity is large enough to calculate heading
             if cfg.yaw_align and not yaw_aligned:
-                if norm(v_gnss_n[:2]) > cfg.yaw_align_min_vel and fix[in_gnss_ptr] == FIX :  # check forward velocity
-                    print('   %.2f sec: Yaw align: ' % (time - t_gnss[0]), end='')
-                    est_C_b_e, P = Align_Yaw(est_C_b_e, C_e_n.T, v_gnss_n, P, run_dir)
-                    if norm(v_gnss_n[:2]) > cfg.yaw_align_max_vel:
-                        yaw_aligned = True  # disable any further yaw alignment
+                if norm(v_gnss_n[:2]) > cfg.yaw_align_min_vel: 
+                    if fix[in_gnss_ptr] <= cfg.yaw_align_min_fix_state:
+                        print('   %.2f sec: Yaw align: hspeed=%.2f verrh=%.2f gyro=%.2f' % (time - t_gnss[0], norm(v_gnss_n[:2]), norm(vel_meas_SD[:2]), norm(meas_omega_ib_b)))
+                        est_C_b_e, P = Align_Yaw(est_C_b_e, C_e_n.T, v_gnss_n, P, run_dir)
+                        if norm(v_gnss_n[:2]) > cfg.yaw_align_max_vel:
+                            yaw_aligned = True  # disable any further yaw alignment
             
             # Process GNSS measurement if not in coast mode
             if coast == 0:
@@ -355,19 +362,22 @@ for p in range(npasses):
                     vel_meas_SD *= noise_gain
 
                     # Run GNSS Measurement Update for Kalman Filter
-                    est_C_b_e, est_v_eb_e, est_r_eb_e, est_IMU_bias, P = LC_KF_GNSS_Update(
-                        r_gnss_e, v_gnss_e, pos_meas_SD, vel_meas_SD, est_C_b_e, C_e_n.T, est_v_eb_e,
-                        est_r_eb_e, est_IMU_bias, P, meas_omega_ib_b, LC_KF_config)
+                    if norm(pos_meas_SD) < cfg.gnss_pos_err_thresh: # skip points with large error
+                        est_C_b_e, est_v_eb_e, est_r_eb_e, est_IMU_bias, P = LC_KF_GNSS_Update(
+                            r_gnss_e, v_gnss_e, pos_meas_SD, vel_meas_SD, est_C_b_e, C_e_n.T, est_v_eb_e,
+                            est_r_eb_e, est_IMU_bias, P, meas_omega_ib_b, LC_KF_config)
 
-                    # record last GNSS measurement, used for velocity matching
-                    prev_time_GNSS_coast = time_GNSS_coast
-                    prev_epoch_GNSS_coast = epoch_GNSS_coast
-                    time_GNSS_coast = time_GNSS
-                    epoch_GNSS_coast = epoch
-                        
-                    # set flag for velocity matching if in coast mode
-                    if outp[epoch-1,10,p] == 1:
-                        vel_match_flag = True
+                        # record last GNSS measurement, used for velocity matching
+                        prev_time_GNSS_coast = time_GNSS_coast
+                        prev_epoch_GNSS_coast = epoch_GNSS_coast
+                        time_GNSS_coast = time_GNSS
+                        epoch_GNSS_coast = epoch
+                            
+                        # set flag for velocity matching if in coast mode
+                        if outp[epoch-1,10,p] == 1:
+                            vel_match_flag = True
+                    else:
+                        print('   %.2f sec: Outlier=%.2f ' % (time - t_gnss[0], norm(pos_meas_SD)))
                     
             # Generate KF uncertainty and IMU bias output records
             out_IMU_bias_est[epoch_GNSS, 0, p] = time
@@ -389,16 +399,19 @@ for p in range(npasses):
             stationary_count = stationary_count + 1 if stationary else 0
             if stationary_count == 1:
                 sum_gyro = meas_omega_ib_b  # reset filter sum
+                sum_accel = meas_f_ib_b 
             elif stationary_count > 1:
                 sum_gyro += meas_omega_ib_b # else add to filter sum
+                sum_accel += meas_f_ib_b
             if stationary_count == cfg.zupt_epoch_count:
                 temp = est_IMU_bias.copy()
                 mean_gyro = sum_gyro / cfg.zupt_epoch_count
+                mean_accel = sum_accel / cfg.zupt_epoch_count
                 est_C_b_e, est_v_eb_e, est_IMU_bias, P = LC_KF_ZUPT_Update(est_C_b_e, 
-                    est_v_eb_e, mean_gyro, est_IMU_bias, P, LC_KF_config, run_dir)
+                    est_v_eb_e, mean_gyro, mean_accel, est_IMU_bias, P, LC_KF_config, gravity, run_dir)
                 stationary_count = 0
-                #with np.printoptions(precision=3, suppress=True):
-                #    print('   ZUPT update:%.1f: ' %  (time-t_gnss[0]), np.rad2deg(temp[3:6]), '->', np.rad2deg(est_IMU_bias[3:6]))
+                # with np.printoptions(precision=3, suppress=True):
+                #    print('   ZUPT update:%.1f: ' %  (time-t_gnss[0]), np.rad2deg(temp[:6]), '->', np.rad2deg(est_IMU_bias[:6]))
 
         # Do non-holonomic update if driving straight and level
         if cfg.nhc_enable and yaw_aligned:

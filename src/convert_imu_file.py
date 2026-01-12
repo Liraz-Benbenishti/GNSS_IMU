@@ -80,8 +80,9 @@ outi[:,7:10] = 0
 outi[:,10] = 0
 
 # Save data
+hdr = '% UNIX time(s),    accX(g),  accY(g),  accZ(g),  gyroX(r/s),gyroY(r/s),gyroZ(r/s),magX(uT),magY(uT),magZ(uT), unused'
 imuFileOut = filepath[:-4] + '_sf.csv'
-np.savetxt(imuFileOut, outi[int(fs*out_skip):], encoding='utf-8', fmt='%.7f', delimiter=',')
+np.savetxt(imuFileOut, outi[int(fs*out_skip):], encoding='utf-8', fmt='%.7f', delimiter=',', header=hdr, comments='')
 
 # Plot data
 plt.figure()

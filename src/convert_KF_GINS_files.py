@@ -103,8 +103,9 @@ outi[:,7:10] = 0
 outi[:,10] = 0
 
 # Save IMU data to file
+hdr = '% UNIX time(s),    accX(g),  accY(g),  accZ(g),  gyroX(r/s),gyroY(r/s),gyroZ(r/s),magX(uT),magY(uT),magZ(uT), unused'
 imuFileOut = join(dataDir, 'imu_' + out_name + '_sf.csv')
-np.savetxt(imuFileOut, outi, encoding='utf-8', fmt='%.7f', delimiter=',')
+np.savetxt(imuFileOut, outi, encoding='utf-8', fmt='%.7f', delimiter=',', header=hdr, comments='')
     
 # # Plot data (optinal)
 # plt.figure()
