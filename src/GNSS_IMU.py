@@ -50,11 +50,6 @@ fileIn = '1934_sf'
 # dataDir = r'..\data\KF_GINS'
 # fileIn = 'ADIS16465_sf'
 
-# Tunnel data
-# import tunnel_0105 as cfg
-# dataDir = r'..\data\tunnel_0105'
-# fileIn = '20251224'
-
 
 ######### Description of inputs/outputs ########################################
 
@@ -342,7 +337,7 @@ for p in range(npasses):
             if cfg.yaw_align and not yaw_aligned:
                 if norm(v_gnss_n[:2]) > cfg.yaw_align_min_vel: 
                     if fix[in_gnss_ptr] <= cfg.yaw_align_min_fix_state:
-                        print('   %.2f sec: Yaw align: hspeed=%.2f verrh=%.2f gyro=%.2f' % (time - t_gnss[0], norm(v_gnss_n[:2]), norm(vel_meas_SD[:2]), norm(meas_omega_ib_b)))
+                        print('   %.2f sec: Yaw align: ' % (time - t_gnss[0]), end='')
                         est_C_b_e, P = Align_Yaw(est_C_b_e, C_e_n.T, v_gnss_n, P, run_dir)
                         if norm(v_gnss_n[:2]) > cfg.yaw_align_max_vel:
                             yaw_aligned = True  # disable any further yaw alignment

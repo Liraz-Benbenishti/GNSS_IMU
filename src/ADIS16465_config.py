@@ -65,8 +65,8 @@ run_dir = [1]  # run direction ([-1]=backwards, [1]=forwards, [-1,1] = combined)
 gnss_epoch_step = 1 # GNSS input sample decimation (1=use all GNSS samples)
 out_step = 1  # Output decimation [1=include all samples]
 out_frame = 'imu'   # 'imu','gnss', or 'origin'
-float_err_gain = 0 # mulitplier on pos/vel stdevs if in float mode
-single_err_gain = 0  # mulitplier on pos/vel stdevs if in single mode
+float_err_gain = 1 # mulitplier on pos/vel stdevs if in float mode
+single_err_gain = 1  # mulitplier on pos/vel stdevs if in single mode
 
 # Velocity matching
 vel_match = False # do velocity matching at end of coast
@@ -110,6 +110,6 @@ init_rpy = [-0.23, 0.24, 179.5]   # initial roll, pitch, yaw (degrees)
 
 # Plotting
 plot_results = True
-plot_bias_data = False    # plot accel and gyro bias states
+plot_bias_data = True    # plot accel and gyro bias states
 plot_imu_data = False  # plot accel, gyro raw data
 plot_unc_data = False  # plot Kalman filter uncertainties
