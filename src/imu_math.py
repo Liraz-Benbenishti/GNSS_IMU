@@ -178,6 +178,7 @@ def ortho_C(C: np.ndarray) -> np.ndarray:
     # Check if CTM is ortho-normalized and if not, ortho-normalize it
     ortho_norm = np.allclose(C.T @ C, np.eye(3), atol=1e-8) and np.isclose(np.linalg.det(C), 1.0, atol=1e-8)
     if not ortho_norm:
+        # print(C)
         U, _, Vt = np.linalg.svd(C)
         R = U @ Vt
         if np.linalg.det(R) < 0:
@@ -331,7 +332,7 @@ def LC_KF_Predict(tor_s, est_C_b_e, est_v_eb_e, est_r_eb_e, est_IMU_bias, P, Qc,
 def LC_KF_GNSS_Update(GNSS_r_eb_e, GNSS_v_eb_e, pos_meas_SD, vel_meas_SD,
                 est_C_b_e, C_n_e, est_v_eb_e, est_r_eb_e, est_IMU_bias,
                 P_propagated, meas_omega_ib_b, LC_KF_config):
-
+    # print("LC_KF_GNSS_Update")
     # Propagated state estimates are all zero due to closed-loop correction.
     ns = LC_KF_config.nstates
     x_est_propagated = np.zeros((ns, 1))
@@ -348,6 +349,7 @@ def LC_KF_GNSS_Update(GNSS_r_eb_e, GNSS_v_eb_e, pos_meas_SD, vel_meas_SD,
 
     # Calculate Kalman gain using (3.21)
     K = P_propagated @ H.T @ inv(H @ P_propagated @ H.T + R)
+    # print("123", P_propagated, H.T, inv(H @ P_propagated @ H.T + R))
 
     # Transform vel/pos estimates from IMU frame to GNSS frame using lever arm
     est_v_gnss_e, est_r_gnss_e = Lever_Arm(est_C_b_e, est_v_eb_e, est_r_eb_e, meas_omega_ib_b,
@@ -360,7 +362,7 @@ def LC_KF_GNSS_Update(GNSS_r_eb_e, GNSS_v_eb_e, pos_meas_SD, vel_meas_SD,
     
     # Update state estimates using (3.24)
     x_est_new = x_est_propagated + K @ delta_z[:,None]
-    
+    # print(x_est_propagated, K, delta_z[:,None])
     # 10. Update state estimation error covariance matrix using (3.25)
     I = np.eye(ns)
     #P_new = (I - K @ H) @ P_propagated # simple form
@@ -370,6 +372,7 @@ def LC_KF_GNSS_Update(GNSS_r_eb_e, GNSS_v_eb_e, pos_meas_SD, vel_meas_SD,
     # CLOSED-LOOP CORRECTION
 
     # Correct attitude, velocity, and position using (14.7-9)
+    # print("est_C_b_e -4", x_est_new[0:3].flatten(), Skew_symmetric(x_est_new[0:3].flatten()), est_C_b_e)
     est_C_b_e_new = (np.eye(3) - Skew_symmetric(x_est_new[0:3].flatten())) @ est_C_b_e
     est_v_eb_e_new = est_v_eb_e - x_est_new[3:6].flatten()
     est_r_eb_e_new = est_r_eb_e - x_est_new[6:9].flatten()

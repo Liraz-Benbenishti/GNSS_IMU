@@ -46,11 +46,14 @@ def Read_GNSS_data(filename):
     data = np.genfromtxt(filename, dtype=str, comments='%')
     no_epochs, _ = data.shape
     ok = True
-    timestamps = data[:,0] + ' ' + data[:,1]
+    # print(f'Read {no_epochs} GNSS epochs from {filename}')   
+    # print(data[:,0])
+    # print(data[:,1])
+    timestamps = np.char.add(np.char.add(data[:,0], ' '), data[:,1]) # data[:,0] + ' ' + data[:,1]
     seconds = np.array([datetime_to_utc(ts) for ts in timestamps])
     in_gnss = np.column_stack((seconds, data[:, 2:].astype(float)))
     in_gnss[:, 1:3] = np.deg2rad(in_gnss[:, 1:3])
-    in_gnss[:,16] *= -1  # NEU -> NED  # RTKLIB is NEU
+    # in_gnss[:,16] *= 0 #-1  # NEU -> NED  # RTKLIB is NEU
     return in_gnss, no_epochs, ok
 
 def Read_IMU_data(filename):
@@ -76,6 +79,7 @@ def Read_IMU_data(filename):
     #   ok           Indicates file has the expected number of columns
     
     in_imu = np.genfromtxt(filename, delimiter=',', comments='%')
+    in_imu = in_imu[1:]
     no_epochs, no_columns = in_imu.shape
     ok = True
     return in_imu, no_epochs, ok

@@ -41,8 +41,10 @@ from imu_transforms import (CTM_to_Euler, Euler_to_CTM, pvc_GNSS_to_ECEF, comput
 
 # Uncomment these lines to run an example of driving with a roof mounted GNSS receiver
 import drive_config as cfg
-dataDir = r'..\data\drive_0708'
-fileIn = '1934_sf'
+dataDir = r"/app/" ## r'..\data\drive_0708'
+fileIn = 'gili_first_headless_w_inter_vel'
+# dataDir = r'../data/drive_0708'
+# fileIn = '1934_sf_reset'
 
 # Uncomment these lines to run a KF-GINS sample data set.  See convert_KF_GINS_files.py for 
 # instructions
@@ -266,6 +268,7 @@ for p in range(npasses):
     # Initialize Kalman filter P matrix and IMU bias states
     C_e_n = compute_C_e_n(est_L_b, est_lambda_b,) # Map to ECEF
     P = Init_P_matrix(LC_KF_config, C_e_n)
+    # print("Initial P matrix:\n", P)
     est_IMU_bias = np.zeros(nbs)
     out_IMU_bias_est[0, 0, p] = prev_time
     out_IMU_bias_est[0, 1:nbs+1, p] = est_IMU_bias
@@ -290,8 +293,10 @@ for p in range(npasses):
         print('   Secs: %.3f' % (t_imu[epoch] - t_imu[0]), end='\r')
         
         # Update time and coast status
+        print("t_imu", t_imu)
         time = t_imu[epoch]
         tor_i = time - prev_time
+        print(time, prev_time)
         if tor_i < 1e-5:
             continue
         coast = outp[epoch,10,p]  # get coast status for this epoch
@@ -313,12 +318,22 @@ for p in range(npasses):
                         meas_f_ib_b, meas_omega_ib_b, gravity)
             else:
                 est_r_eb_e += est_v_eb_e * tor_i  # assume constant velocity if no IMU
-
+        # print("est_C_b_e -10", est_C_b_e)
         # Kalman state prediction if run for both IMU and GNSS measurements
+        # print(tor_i, est_C_b_e, est_v_eb_e, est_r_eb_e, est_IMU_bias,
+        #                P, Qc, meas_f_ib_b, meas_omega_ib_b, LC_KF_config,
+        #                gravity, geocentric_radius)
         P = LC_KF_Predict(tor_i, est_C_b_e, est_v_eb_e, est_r_eb_e, est_IMU_bias,
                        P, Qc, meas_f_ib_b, meas_omega_ib_b, LC_KF_config,
                        gravity, geocentric_radius)
-    
+        if np.isnan(P).any():
+            print(tor_i, meas_f_ib_b, meas_omega_ib_b)
+            # print(epoch, P, tor_i, est_C_b_e, est_v_eb_e, est_r_eb_e, est_IMU_bias,
+            #            P, Qc, meas_f_ib_b, meas_omega_ib_b, LC_KF_config,
+            #            gravity, geocentric_radius)
+            raise ValueError("Array contains NaN! Stopping execution.")
+        # print("P", num_epochs, P)
+        # print("est_C_b_e -9", est_C_b_e)
         # Check for next GNSS measurement
         while time * run_dir >= time_next_GNSS * run_dir:
             # Get next GNSS measurement
@@ -339,6 +354,7 @@ for p in range(npasses):
                     if fix[in_gnss_ptr] <= cfg.yaw_align_min_fix_state:
                         print('   %.2f sec: Yaw align: ' % (time - t_gnss[0]), end='')
                         est_C_b_e, P = Align_Yaw(est_C_b_e, C_e_n.T, v_gnss_n, P, run_dir)
+                        # print("est_C_b_e -7", est_C_b_e)
                         if norm(v_gnss_n[:2]) > cfg.yaw_align_max_vel:
                             yaw_aligned = True  # disable any further yaw alignment
             
@@ -361,7 +377,7 @@ for p in range(npasses):
                         est_C_b_e, est_v_eb_e, est_r_eb_e, est_IMU_bias, P = LC_KF_GNSS_Update(
                             r_gnss_e, v_gnss_e, pos_meas_SD, vel_meas_SD, est_C_b_e, C_e_n.T, est_v_eb_e,
                             est_r_eb_e, est_IMU_bias, P, meas_omega_ib_b, LC_KF_config)
-
+                        # print("est_C_b_e -6", est_C_b_e)
                         # record last GNSS measurement, used for velocity matching
                         prev_time_GNSS_coast = time_GNSS_coast
                         prev_epoch_GNSS_coast = epoch_GNSS_coast
@@ -385,7 +401,7 @@ for p in range(npasses):
                 time_next_GNSS = in_gnss[in_gnss_ptr + gnss_epoch_inc, 0]
             else:
                 time_next_GNSS = time_GNSS + 1000 * run_dir;  # set to large value if at end
-        
+        # print("est_C_b_e -8", est_C_b_e)
         # End of GNSS measurement processing loop       
         
         # Check accel/gyro and do zero velocity update if near zero
@@ -419,7 +435,7 @@ for p in range(npasses):
                 #with np.printoptions(precision=3, suppress=True):
                 #    print('   NHC update %.2f: ' % (time-t_gnss[0]), est_C_b_e.T @ v, '->', est_C_b_e.T @ est_v_eb_e)
                 nhc_count = 0
-        
+        # print("est_C_b_e", t_imu[epoch], epoch, est_C_b_e)
         # Check if est_C_b_e is ortho-normal and if not, ortho-normalize it
         est_C_b_e = ortho_C(est_C_b_e)
         
@@ -501,7 +517,7 @@ if cfg.plot_imu_data:
 
 # Save output in RTKLIB solution file format
 if npasses == 1 and run_dir == -1:
-    fileOut = join(dataDir, 'gnss_imu_%s_b.pos' % fileIn )
+    fileOut = join(dataDir, '/app/gnss_imu_%s_b.pos' % fileIn )
 else:
-    fileOut = join(dataDir, 'gnss_imu_%s.pos' % fileIn )
+    fileOut = join(dataDir, '/app/gnss_imu_%s.pos' % fileIn )
 Write_GNSS_data(fileOut, outp, out_KF_SD)
